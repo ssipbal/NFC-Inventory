@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NFC Smart Inventory System</title>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+  <title>Smart Inventory App</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun&display=swap" rel="stylesheet">
   <style>
     * {
       font-family: 'Sarabun', sans-serif;
@@ -12,311 +12,228 @@
     }
     body {
       margin: 0;
-      background: #f8f9fa;
-      color: #212529;
+      padding: 0;
+      background: #f5f7fa;
     }
-    .app-container {
+    .page {
+      display: none;
+      padding: 20px;
+    }
+    .active {
+      display: block;
+    }
+    .center {
       display: flex;
       justify-content: center;
       align-items: center;
-      min-height: 100vh;
-      padding: 1rem;
-    }
-    .card {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      padding: 2rem;
-      width: 100%;
-      max-width: 450px;
-    }
-    h2 {
-      margin-top: 0;
-      font-size: 1.5rem;
-      text-align: center;
-    }
-    input, button {
-      width: 100%;
-      padding: 0.75rem;
-      margin-top: 1rem;
-      font-size: 1rem;
-      border-radius: 8px;
-      border: 1px solid #ccc;
+      height: 100vh;
+      flex-direction: column;
     }
     button {
+      padding: 15px 30px;
+      margin: 10px;
+      border: none;
+      border-radius: 10px;
       background-color: #007bff;
       color: white;
-      border: none;
+      font-size: 16px;
       cursor: pointer;
     }
-    button:hover {
-      background-color: #0056b3;
+    .summary-table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
     }
-    .summary {
-      margin-top: 2rem;
+    .summary-table th, .summary-table td {
+      padding: 10px;
+      border-bottom: 1px solid #ccc;
     }
-    .summary-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 0.5rem;
-    }
-    .summary-item input {
-      width: 50px;
-      margin-left: 10px;
-    }
-    .nav-toggle {
-      display: flex;
-      justify-content: space-around;
-      margin-bottom: 2rem;
-    }
-    .nav-toggle button {
-      width: 45%;
-    }
-    .hidden {
-      display: none;
-    }
-    .log-box {
-      background: #f1f3f5;
-      padding: 0.5rem;
-      margin-top: 1rem;
-      border-radius: 6px;
-    }
-    .stock-control {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 0.5rem;
-    }
-    .stock-control input {
+    .input-small {
       width: 60px;
-      margin: 0 10px;
     }
   </style>
 </head>
 <body>
-<div class="app-container">
-  <div class="card" id="mainCard">
-    <div class="nav-toggle">
-      <button onclick="showCustomer()">Customer</button>
-      <button onclick="showAdmin()">Admin</button>
-    </div>
 
-    <!-- CUSTOMER PAGE -->
-    <div id="customerPage" class="hidden">
-      <h2>Scan the Product</h2>
-      <div class="tag">Enter NFC ID or product shortcut (C/T/S)</div>
-      <input id="nfcInput" placeholder="Enter NFC code or shortcut" oninput="showSuggestions(this.value)" />
-      <div id="suggestBox" class="log-box hidden"></div>
-      <input id="quantityInput" placeholder="Enter quantity" type="number" />
-      <button onclick="addToOrder()">Add to Summary</button>
-      <div class="summary" id="summaryList"></div>
-      <button onclick="submitOrder()">Submit Order</button>
-    </div>
+<!-- Main Page -->
+<div id="main" class="page active center">
+  <h1>Smart Inventory</h1>
+  <button onclick="showPage('customer')">Customer</button>
+  <button onclick="adminLogin()">Admin</button>
+</div>
 
-    <!-- ADMIN LOGIN -->
-    <div id="adminLogin" class="hidden">
-      <h2>Admin Login</h2>
-      <input id="adminCode" placeholder="Enter code" type="password" />
-      <button onclick="checkAdmin()">Enter</button>
-    </div>
+<!-- Customer Page -->
+<div id="customer" class="page">
+  <h2>Scan the product</h2>
+  <button onclick="startScan()">Scan NFC</button>
+  <table class="summary-table" id="summaryTable">
+    <thead>
+      <tr><th>Product</th><th>Quantity</th><th>Price</th><th>Edit</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <button onclick="submitOrder()">Submit Order</button>
+  <button onclick="showPage('main')">Back</button>
+</div>
 
-    <!-- ADMIN PAGE -->
-    <div id="adminPage" class="hidden">
-      <h2>Admin Panel</h2>
-      <div id="stockDisplay"></div>
-      <h3>Adjust Stock</h3>
-      <div class="stock-control">
-        Cleanser: 
-        <input id="stockC" type="number" placeholder="Amount" />
-        <button onclick="updateStock('Cleanser', parseInt(document.getElementById('stockC').value))">Add</button>
-        <button onclick="updateStock('Cleanser', -parseInt(document.getElementById('stockC').value))">Remove</button>
-      </div>
-      <div class="stock-control">
-        Toner: 
-        <input id="stockT" type="number" placeholder="Amount" />
-        <button onclick="updateStock('Toner', parseInt(document.getElementById('stockT').value))">Add</button>
-        <button onclick="updateStock('Toner', -parseInt(document.getElementById('stockT').value))">Remove</button>
-      </div>
-      <div class="stock-control">
-        Serum: 
-        <input id="stockS" type="number" placeholder="Amount" />
-        <button onclick="updateStock('Serum', parseInt(document.getElementById('stockS').value))">Add</button>
-        <button onclick="updateStock('Serum', -parseInt(document.getElementById('stockS').value))">Remove</button>
-      </div>
-      <button onclick="showServer()">View Server Logs</button>
-    </div>
+<!-- Admin Page -->
+<div id="admin" class="page">
+  <h2>Admin Panel</h2>
+  <table class="summary-table">
+    <thead>
+      <tr><th>Product</th><th>Stock</th><th>+ / -</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Cleanser</td>
+        <td id="stock-Cleanser">0</td>
+        <td>
+          <button onclick="editStock('Cleanser', 1)">+</button>
+          <button onclick="editStock('Cleanser', -1)">-</button>
+        </td>
+      </tr>
+      <tr>
+        <td>Toner</td>
+        <td id="stock-Toner">0</td>
+        <td>
+          <button onclick="editStock('Toner', 1)">+</button>
+          <button onclick="editStock('Toner', -1)">-</button>
+        </td>
+      </tr>
+      <tr>
+        <td>Serum</td>
+        <td id="stock-Serum">0</td>
+        <td>
+          <button onclick="editStock('Serum', 1)">+</button>
+          <button onclick="editStock('Serum', -1)">-</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <button onclick="showPage('server')">Server</button>
+  <button onclick="showPage('main')">Back</button>
+</div>
 
-    <!-- SERVER PAGE -->
-    <div id="serverPage" class="hidden">
-      <h2>Server Logs</h2>
-      <div id="serverLogs" class="log-box"></div>
-      <button onclick="backToAdmin()">Back</button>
-    </div>
-  </div>
+<!-- Server Page -->
+<div id="server" class="page">
+  <h2>Server Logs</h2>
+  <pre id="logOutput" style="background:#eee;padding:10px;border-radius:8px;max-height:300px;overflow:auto;"></pre>
+  <button onclick="showPage('admin')">Back to Admin</button>
 </div>
 
 <script>
-  const nfcMap = {
-    "04A11F89320289": "Cleanser",
-    "04F1458B320289": "Toner",
-    "04816B94320289": "Serum",
-    "C": "Cleanser",
-    "T": "Toner",
-    "S": "Serum"
+  const productMap = {
+    "04A11F89320289": { name: "Cleanser", price: 10 },
+    "04F1458B320289": { name: "Toner", price: 15 },
+    "04816B94320289": { name: "Serum", price: 20 },
   };
 
-  let currentOrders = [];
-  let serverLogs = [];
   let stock = {
-    "Cleanser": 10,
-    "Toner": 10,
-    "Serum": 10
+    "Cleanser": 0,
+    "Toner": 0,
+    "Serum": 0
   };
 
-  function showCustomer() {
-    hideAll();
-    document.getElementById("customerPage").classList.remove("hidden");
+  let orderSummary = {};
+  let logs = [];
+
+  function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id === 'server') renderLogs();
+    if (id === 'admin') renderStock();
+    if (id === 'customer') renderSummary();
   }
 
-  function showAdmin() {
-    hideAll();
-    document.getElementById("adminLogin").classList.remove("hidden");
+  function adminLogin() {
+    const pass = prompt("Enter Admin Passcode:");
+    if (pass === "12345") showPage('admin');
+    else alert("Incorrect passcode.");
   }
 
-  function checkAdmin() {
-    const pass = document.getElementById("adminCode").value;
-    if (pass === "12345") {
-      hideAll();
-      document.getElementById("adminPage").classList.remove("hidden");
-      renderStock();
+  function startScan() {
+    if ('NDEFReader' in window) {
+      const reader = new NDEFReader();
+      reader.scan().then(() => {
+        reader.onreading = event => {
+          const id = Array.from(event.serialNumber).map(x => x.charCodeAt(0).toString(16).padStart(2, '0')).join('').toUpperCase();
+          const realID = event.serialNumber.toUpperCase();
+          handleNFCScan(realID);
+        };
+      }).catch(err => alert("NFC Scan Failed: " + err));
     } else {
-      alert("Wrong code");
+      alert("Web NFC is not supported on this browser/device.");
     }
   }
 
-  function showServer() {
-    hideAll();
-    document.getElementById("serverPage").classList.remove("hidden");
-    renderLogs();
-  }
-
-  function backToAdmin() {
-    hideAll();
-    document.getElementById("adminPage").classList.remove("hidden");
-    renderStock();
-  }
-
-  function hideAll() {
-    ["customerPage", "adminLogin", "adminPage", "serverPage"].forEach(id => {
-      document.getElementById(id).classList.add("hidden");
-    });
-  }
-
-  function showSuggestions(value) {
-    const key = value.trim().toUpperCase();
-    const suggest = nfcMap[key];
-    const box = document.getElementById("suggestBox");
-    if (suggest) {
-      box.innerText = "Detected: " + suggest;
-      box.classList.remove("hidden");
-    } else {
-      box.classList.add("hidden");
-    }
-  }
-
-  function addToOrder() {
-    const code = document.getElementById("nfcInput").value.trim().toUpperCase();
-    const quantity = parseInt(document.getElementById("quantityInput").value);
-    const product = nfcMap[code];
-
-    if (!product || isNaN(quantity) || quantity <= 0) {
-      alert("Invalid input.");
+  function handleNFCScan(id) {
+    const product = productMap[id];
+    if (!product) {
+      alert("Unrecognized NFC Tag");
       return;
     }
 
-    const currentStock = stock[product] || 0;
-    const totalOrdered = currentOrders.reduce((sum, item) => 
-      item.product === product ? sum + item.quantity : sum, 0);
+    const qty = parseInt(prompt(`How many ${product.name}?`));
+    if (!qty || qty < 1) return;
 
-    if (quantity + totalOrdered > currentStock) {
-      alert("Not enough stock!");
-      return;
-    }
+    if (!orderSummary[product.name]) orderSummary[product.name] = 0;
+    orderSummary[product.name] += qty;
 
-    const existing = currentOrders.find(item => item.product === product);
-    if (existing) {
-      existing.quantity += quantity;
-    } else {
-      currentOrders.push({ product, quantity });
-    }
-
-    document.getElementById("nfcInput").value = "";
-    document.getElementById("quantityInput").value = "";
-    showOrderSummary();
+    renderSummary();
   }
 
-  function showOrderSummary() {
-    const list = document.getElementById("summaryList");
-    list.innerHTML = "";
-    currentOrders.forEach((item, idx) => {
-      const row = document.createElement("div");
-      row.className = "summary-item";
-      row.innerHTML = `
-        ${item.product}: 
-        <input type="number" value="${item.quantity}" onchange="editQuantity(${idx}, this.value)" />
-        <button onclick="removeItem(${idx})">🗑</button>
+  function renderSummary() {
+    const tbody = document.querySelector("#summaryTable tbody");
+    tbody.innerHTML = "";
+    Object.entries(orderSummary).forEach(([product, qty]) => {
+      const price = productMap[Object.keys(productMap).find(k => productMap[k].name === product)].price;
+      tbody.innerHTML += `
+        <tr>
+          <td>${product}</td>
+          <td><input class="input-small" type="number" value="${qty}" onchange="updateQty('${product}', this.value)"/></td>
+          <td>฿${price * qty}</td>
+          <td><button onclick="removeProduct('${product}')">Remove</button></td>
+        </tr>
       `;
-      list.appendChild(row);
     });
   }
 
-  function editQuantity(index, value) {
-    const qty = parseInt(value);
-    if (!isNaN(qty) && qty > 0) {
-      currentOrders[index].quantity = qty;
-    }
+  function updateQty(product, value) {
+    orderSummary[product] = parseInt(value);
+    renderSummary();
   }
 
-  function removeItem(index) {
-    currentOrders.splice(index, 1);
-    showOrderSummary();
+  function removeProduct(product) {
+    delete orderSummary[product];
+    renderSummary();
   }
 
   function submitOrder() {
     const timestamp = new Date().toLocaleString();
-    currentOrders.forEach(item => {
-      serverLogs.push({ ...item, time: timestamp });
-      stock[item.product] -= item.quantity;
+    Object.entries(orderSummary).forEach(([product, qty]) => {
+      stock[product] -= qty;
+      logs.push(`[ORDER] ${timestamp}: ${qty} x ${product}`);
     });
-    alert("Order submitted!");
-    currentOrders = [];
-    showOrderSummary();
+    orderSummary = {};
+    alert("Order Submitted!");
+    renderSummary();
   }
 
-  function renderLogs() {
-    const box = document.getElementById("serverLogs");
-    box.innerHTML = "";
-    serverLogs.forEach(log => {
-      box.innerHTML += `${log.time}: ${log.product} x ${log.quantity}<br>`;
-    });
+  function editStock(product, delta) {
+    stock[product] += delta;
+    if (stock[product] < 0) stock[product] = 0;
+    logs.push(`[STOCK] ${new Date().toLocaleString()}: ${delta > 0 ? "Added" : "Removed"} ${Math.abs(delta)} x ${product}`);
+    renderStock();
   }
 
   function renderStock() {
-    const box = document.getElementById("stockDisplay");
-    box.innerHTML = `<h3>Current Stock</h3>
-      <div class="log-box">
-        Cleanser: ${stock["Cleanser"]}<br>
-        Toner: ${stock["Toner"]}<br>
-        Serum: ${stock["Serum"]}
-      </div>`;
+    for (let product in stock) {
+      document.getElementById(`stock-${product}`).textContent = stock[product];
+    }
   }
 
-  function updateStock(product, amount) {
-    if (isNaN(amount)) return;
-    stock[product] += amount;
-    if (stock[product] < 0) stock[product] = 0;
-    renderStock();
+  function renderLogs() {
+    document.getElementById("logOutput").textContent = logs.join('\n');
   }
 </script>
 </body>

@@ -3,191 +3,244 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Inventory System</title>
+  <title>Smart Inventory via NFC</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Sarabun', sans-serif;
       margin: 0;
-      background: #f8f8f8;
+      padding: 0;
+      background-color: #f4f4f9;
       color: #333;
     }
-    header {
-      background: #007bff;
-      color: white;
-      padding: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
     .container {
-      padding: 2rem;
+      max-width: 800px;
+      margin: auto;
+      padding: 20px;
     }
-    .btn {
-      padding: 0.5rem 1rem;
-      border: none;
-      background: #007bff;
+    h1, h2 {
+      text-align: center;
+    }
+    .button {
+      display: inline-block;
+      margin: 10px;
+      padding: 10px 20px;
+      background-color: #4CAF50;
       color: white;
-      cursor: pointer;
-      margin: 0.5rem;
+      border: none;
       border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
     }
-    .btn:hover {
-      background: #0056b3;
+    .button:hover {
+      background-color: #45a049;
     }
-    .card {
-      background: white;
-      padding: 1rem;
-      margin: 1rem 0;
+    .input-group {
+      margin: 15px 0;
+    }
+    input, select {
+      padding: 10px;
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 5px;
+    }
+    .summary {
+      background-color: #fff;
+      padding: 15px;
       border-radius: 8px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
     }
-    th, td {
-      padding: 0.5rem;
-      border: 1px solid #ddd;
-      text-align: center;
-    }
-    input[type="number"] {
-      width: 60px;
+    .lang-toggle {
+      position: absolute;
+      top: 10px;
+      right: 10px;
     }
   </style>
 </head>
 <body>
-  <header>
-    <div>Smart Inventory System</div>
-    <div>
-      <button class="btn" onclick="switchLanguage('en')">EN</button>
-      <button class="btn" onclick="switchLanguage('th')">TH</button>
+  <div class="container" id="mainPage">
+    <div class="lang-toggle">
+      <button onclick="toggleLanguage()" class="button">EN/TH</button>
     </div>
-  </header>
-
-  <div class="container" id="main-page">
-    <button class="btn" onclick="goToCustomer()">Customer</button>
-    <button class="btn" onclick="goToAdmin()">Admin</button>
+    <h1 id="mainTitle">Smart Inventory</h1>
+    <button onclick="goToCustomer()" class="button">Customer</button>
+    <button onclick="goToAdmin()" class="button">Admin</button>
   </div>
 
-  <div class="container" id="customer-page" style="display:none">
+  <div class="container" id="customerPage" style="display:none">
     <h2>Scan the product</h2>
-    <select id="product-select">
-      <option value="">--Select Product--</option>
-      <option value="Cleanser">Cleanser</option>
-      <option value="Toner">Toner</option>
-      <option value="Serum">Serum</option>
-    </select>
-    <input type="number" id="quantity" placeholder="Qty" min="1" />
-    <button class="btn" onclick="addToSummary()">Add</button>
-    <div id="summary" class="card"></div>
-    <button class="btn" onclick="submitOrder()">Submit Order</button>
+    <div class="input-group">
+      <label for="nfcInput">Tap NFC or type product code (C, T, S)</label>
+      <input id="nfcInput" oninput="autoSuggest()" placeholder="e.g., C for Cleanser" />
+    </div>
+    <div class="input-group">
+      <label for="quantity">Quantity</label>
+      <input type="number" id="quantity" min="1" />
+    </div>
+    <button class="button" onclick="addToSummary()">Add to Summary</button>
+    <div class="summary" id="summaryBox"></div>
+    <button class="button" onclick="submitOrder()">Submit Order</button>
   </div>
 
-  <div class="container" id="admin-login" style="display:none">
-    <input type="password" id="admin-pass" placeholder="Enter passcode" />
-    <button class="btn" onclick="checkAdmin()">Login</button>
+  <div class="container" id="adminLogin" style="display:none">
+    <h2>Enter Passcode</h2>
+    <input type="password" id="adminPass" />
+    <button class="button" onclick="checkPasscode()">Enter</button>
   </div>
 
-  <div class="container" id="admin-page" style="display:none">
-    <h2>Stock Control</h2>
-    <div id="stock-control" class="card"></div>
-    <button class="btn" onclick="goToServerPage()">Server</button>
+  <div class="container" id="adminPage" style="display:none">
+    <h2>Admin Stock Manager</h2>
+    <div class="input-group">
+      <label for="stockProduct">Product</label>
+      <select id="stockProduct">
+        <option value="Cleanser">Cleanser</option>
+        <option value="Toner">Toner</option>
+        <option value="Serum">Serum</option>
+      </select>
+    </div>
+    <div class="input-group">
+      <label for="stockAmount">Amount</label>
+      <input type="number" id="stockAmount" />
+    </div>
+    <button class="button" onclick="updateStock('add')">Add Stock</button>
+    <button class="button" onclick="updateStock('delete')">Delete Stock</button>
+    <br /><br />
+    <button class="button" onclick="goToServer()">Server</button>
   </div>
 
-  <div class="container" id="server-page" style="display:none">
+  <div class="container" id="serverPage" style="display:none">
     <h2>Server Logs</h2>
-    <div id="logs" class="card"></div>
-    <button class="btn" onclick="backToAdmin()">Back</button>
-  </div>
-
-  <script>
-    const prices = { Cleanser: 10, Toner: 15, Serum: 20 };
-    const summary = [];
-    const stock = { Cleanser: 100, Toner: 100, Serum: 100 };
-    const logs = [];
-
-    function switchLanguage(lang) {
-      alert('Switching to ' + lang);
-    }
+    const productPrices = {
+      Cleanser: 10,
+      Toner: 15,
+      Serum: 20
+    };
+    let stock = {
+      Cleanser: 10,
+      Toner: 10,
+      Serum: 10
+    };
+    let orderSummary = [];
+    let logs = [];
 
     function goToCustomer() {
-      document.getElementById('main-page').style.display = 'none';
-      document.getElementById('customer-page').style.display = 'block';
+      showPage("customerPage");
     }
-
-    function goToAdmin() {
-      document.getElementById('main-page').style.display = 'none';
-      document.getElementById('admin-login').style.display = 'block';
-    }
-
     function checkAdmin() {
-      const pass = document.getElementById('admin-pass').value;
-      if (pass === '12345') {
-        document.getElementById('admin-login').style.display = 'none';
-        document.getElementById('admin-page').style.display = 'block';
-        renderStock();
-      } else {
-        alert('Wrong passcode');
-      }
+      showPage("adminLogin");
+    }
+    function verifyAdmin() {
+      const code = document.getElementById("adminCode").value;
+      if (code === "12345") showPage("adminPage");
+    }
+    function goToServer() {
+      showPage("serverPage");
+      populateLogs();
+    }
+    function goToAdmin() {
+      showPage("adminPage");
+    }
+    function goBackToMain() {
+      showPage("mainPage");
     }
 
-    function renderStock() {
-      const container = document.getElementById('stock-control');
-      container.innerHTML = '';
-      for (let key in stock) {
-        container.innerHTML += `${key}: ${stock[key]}<br/>`;
-      }
+    function showPage(id) {
+      document.querySelectorAll(".container").forEach(p => p.classList.add("hidden"));
+      document.getElementById(id).classList.remove("hidden");
+      if (id === "adminPage") populateStock();
+    }
+
+    function suggestProduct() {
+      const val = document.getElementById("nfcInput").value.toUpperCase();
+      const box = document.getElementById("suggestions");
+      box.innerHTML = productMap[val] ? `<p>Suggestion: ${productMap[val]}</p>` : "";
     }
 
     function addToSummary() {
-      const product = document.getElementById('product-select').value;
-      const qty = parseInt(document.getElementById('quantity').value);
-      if (!product || !qty || qty <= 0) return alert('Invalid input');
-      summary.push({ product, qty, price: prices[product] });
-      renderSummary();
+      const code = document.getElementById("nfcInput").value.toUpperCase();
+      const qty = parseInt(document.getElementById("quantityInput").value);
+      const product = productMap[code] || code;
+      if (!productPrices[product] || qty <= 0) return;
+
+      const existing = orderSummary.find(item => item.product === product);
+      if (existing) existing.qty += qty;
+      else orderSummary.push({ product, qty });
+
+      updateSummaryTable();
+      document.getElementById("nfcInput").value = "";
+      document.getElementById("quantityInput").value = "";
     }
 
-    function renderSummary() {
-      const div = document.getElementById('summary');
-      div.innerHTML = '<h3>Order Summary</h3><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Edit</th></tr>';
-      summary.forEach((item, i) => {
-        div.innerHTML += `<tr><td>${item.product}</td><td><input type='number' value='${item.qty}' min='1' onchange='editQty(${i}, this.value)'/></td><td>${item.qty * item.price} THB</td><td><button onclick='removeItem(${i})'>X</button></td></tr>`;
+    function updateSummaryTable() {
+      const tbody = document.getElementById("summaryTable").querySelector("tbody");
+      tbody.innerHTML = "";
+      orderSummary.forEach((item, i) => {
+        const row = `<tr>
+          <td>${item.product}</td>
+          <td><input type='number' value='${item.qty}' onchange='editQty(${i}, this.value)'/></td>
+          <td>${productPrices[item.product]}</td>
+          <td>${item.qty * productPrices[item.product]}</td>
+          <td><button onclick='removeItem(${i})'>Delete</button></td>
+        </tr>`;
+        tbody.innerHTML += row;
       });
-      div.innerHTML += '</table>';
     }
 
     function editQty(index, newQty) {
-      summary[index].qty = parseInt(newQty);
-      renderSummary();
+      orderSummary[index].qty = parseInt(newQty);
+      updateSummaryTable();
     }
 
     function removeItem(index) {
-      summary.splice(index, 1);
-      renderSummary();
+      orderSummary.splice(index, 1);
+      updateSummaryTable();
     }
 
     function submitOrder() {
-      const now = new Date().toLocaleString();
-      summary.forEach(item => {
+      orderSummary.forEach(item => {
         stock[item.product] -= item.qty;
-        logs.push(`[${now}] Customer ordered ${item.qty} ${item.product}`);
+        logs.push({ action: "Order", product: item.product, qty: item.qty, time: new Date().toLocaleString() });
       });
-      summary.length = 0;
-      renderSummary();
-      alert('Order submitted!');
+      orderSummary = [];
+      updateSummaryTable();
+      alert("Order submitted!");
     }
 
-    function goToServerPage() {
-      document.getElementById('admin-page').style.display = 'none';
-      document.getElementById('server-page').style.display = 'block';
-      const logsDiv = document.getElementById('logs');
-      logsDiv.innerHTML = logs.join('<br/>');
+    function populateStock() {
+      const tbody = document.getElementById("stockTable").querySelector("tbody");
+      tbody.innerHTML = "";
+      Object.entries(stock).forEach(([p, q]) => {
+        tbody.innerHTML += `<tr><td>${p}</td><td>${q}</td></tr>`;
+      });
     }
 
-    function backToAdmin() {
-      document.getElementById('server-page').style.display = 'none';
-      document.getElementById('admin-page').style.display = 'block';
+    function addStock() {
+      const p = document.getElementById("stockProduct").value;
+      const q = parseInt(document.getElementById("stockAmount").value);
+      stock[p] += q;
+      logs.push({ action: "Add Stock", product: p, qty: q, time: new Date().toLocaleString() });
+      populateStock();
+    }
+
+    function removeStock() {
+      const p = document.getElementById("stockProduct").value;
+      const q = parseInt(document.getElementById("stockAmount").value);
+      stock[p] -= q;
+      logs.push({ action: "Remove Stock", product: p, qty: q, time: new Date().toLocaleString() });
+      populateStock();
+    }
+
+    function populateLogs() {
+      const tbody = document.getElementById("logTable").querySelector("tbody");
+      tbody.innerHTML = "";
+      logs.forEach(log => {
+        tbody.innerHTML += `<tr><td>${log.action}</td><td>${log.product}</td><td>${log.qty}</td><td>${log.time}</td></tr>`;
+      });
     }
   </script>
 </body>

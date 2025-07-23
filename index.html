@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Smart Inventory via NFC</title>
+  <title>NFC Smart Inventory System</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
   <style>
     * {
@@ -28,11 +28,11 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       padding: 2rem;
       width: 100%;
-      max-width: 480px;
+      max-width: 450px;
     }
     h2 {
       margin-top: 0;
-      font-size: 1.6rem;
+      font-size: 1.5rem;
       text-align: center;
     }
     input, button {
@@ -52,21 +52,18 @@
     button:hover {
       background-color: #0056b3;
     }
-    .summary-item, .stock-item {
+    .summary {
+      margin-top: 2rem;
+    }
+    .summary-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
     }
     .summary-item input {
       width: 50px;
       margin-left: 10px;
-    }
-    .log-box {
-      background: #f1f3f5;
-      padding: 0.5rem;
-      margin-top: 1rem;
-      border-radius: 6px;
     }
     .nav-toggle {
       display: flex;
@@ -79,18 +76,21 @@
     .hidden {
       display: none;
     }
-    .tag {
-      font-size: 0.9rem;
+    .log-box {
+      background: #f1f3f5;
+      padding: 0.5rem;
       margin-top: 1rem;
-      color: gray;
+      border-radius: 6px;
     }
-    .suggestion {
-      margin-top: 0.3rem;
-      font-size: 0.95rem;
-      color: #555;
-      padding: 0.3rem;
-      background: #e2e6ea;
-      border-radius: 4px;
+    .stock-control {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.5rem;
+    }
+    .stock-control input {
+      width: 60px;
+      margin: 0 10px;
     }
   </style>
 </head>
@@ -104,13 +104,12 @@
 
     <!-- CUSTOMER PAGE -->
     <div id="customerPage" class="hidden">
-      <h2>Scan Product</h2>
-      <div class="tag">Type C = Cleanser, T = Toner, S = Serum</div>
-      <input id="nfcInput" placeholder="Enter NFC or product name" oninput="smartSearch(this.value)" />
-      <div id="suggestionBox" class="suggestion hidden"></div>
+      <h2>Scan the Product</h2>
+      <div class="tag">Enter NFC ID or product shortcut (C/T/S)</div>
+      <input id="nfcInput" placeholder="Enter NFC code or shortcut" oninput="showSuggestions(this.value)" />
+      <div id="suggestBox" class="log-box hidden"></div>
       <input id="quantityInput" placeholder="Enter quantity" type="number" />
       <button onclick="addToOrder()">Add to Summary</button>
-
       <div class="summary" id="summaryList"></div>
       <button onclick="submitOrder()">Submit Order</button>
     </div>
@@ -125,8 +124,26 @@
     <!-- ADMIN PAGE -->
     <div id="adminPage" class="hidden">
       <h2>Admin Panel</h2>
-      <h3>Stock Levels</h3>
-      <div id="stockList"></div>
+      <div id="stockDisplay"></div>
+      <h3>Adjust Stock</h3>
+      <div class="stock-control">
+        Cleanser: 
+        <input id="stockC" type="number" placeholder="Amount" />
+        <button onclick="updateStock('Cleanser', parseInt(document.getElementById('stockC').value))">Add</button>
+        <button onclick="updateStock('Cleanser', -parseInt(document.getElementById('stockC').value))">Remove</button>
+      </div>
+      <div class="stock-control">
+        Toner: 
+        <input id="stockT" type="number" placeholder="Amount" />
+        <button onclick="updateStock('Toner', parseInt(document.getElementById('stockT').value))">Add</button>
+        <button onclick="updateStock('Toner', -parseInt(document.getElementById('stockT').value))">Remove</button>
+      </div>
+      <div class="stock-control">
+        Serum: 
+        <input id="stockS" type="number" placeholder="Amount" />
+        <button onclick="updateStock('Serum', parseInt(document.getElementById('stockS').value))">Add</button>
+        <button onclick="updateStock('Serum', -parseInt(document.getElementById('stockS').value))">Remove</button>
+      </div>
       <button onclick="showServer()">View Server Logs</button>
     </div>
 
@@ -140,26 +157,22 @@
 </div>
 
 <script>
-  const productMap = {
-    C: "Cleanser",
-    T: "Toner",
-    S: "Serum"
-  };
-
-  let productStock = {
-    Cleanser: 50,
-    Toner: 30,
-    Serum: 20
+  const nfcMap = {
+    "04A11F89320289": "Cleanser",
+    "04F1458B320289": "Toner",
+    "04816B94320289": "Serum",
+    "C": "Cleanser",
+    "T": "Toner",
+    "S": "Serum"
   };
 
   let currentOrders = [];
   let serverLogs = [];
-
-  function hideAll() {
-    ["customerPage", "adminLogin", "adminPage", "serverPage"].forEach(id =>
-      document.getElementById(id).classList.add("hidden")
-    );
-  }
+  let stock = {
+    "Cleanser": 10,
+    "Toner": 10,
+    "Serum": 10
+  };
 
   function showCustomer() {
     hideAll();
@@ -175,8 +188,8 @@
     const pass = document.getElementById("adminCode").value;
     if (pass === "12345") {
       hideAll();
-      renderStockList();
       document.getElementById("adminPage").classList.remove("hidden");
+      renderStock();
     } else {
       alert("Wrong code");
     }
@@ -190,34 +203,44 @@
 
   function backToAdmin() {
     hideAll();
-    renderStockList();
     document.getElementById("adminPage").classList.remove("hidden");
+    renderStock();
   }
 
-  function smartSearch(value) {
-    const suggestBox = document.getElementById("suggestionBox");
-    let key = value.trim().toUpperCase();
-    let matched = productMap[key] || Object.values(productMap).find(p => p.toLowerCase().includes(value.toLowerCase()));
-    if (matched) {
-      suggestBox.innerText = "Detected: " + matched;
-      suggestBox.classList.remove("hidden");
+  function hideAll() {
+    ["customerPage", "adminLogin", "adminPage", "serverPage"].forEach(id => {
+      document.getElementById(id).classList.add("hidden");
+    });
+  }
+
+  function showSuggestions(value) {
+    const key = value.trim().toUpperCase();
+    const suggest = nfcMap[key];
+    const box = document.getElementById("suggestBox");
+    if (suggest) {
+      box.innerText = "Detected: " + suggest;
+      box.classList.remove("hidden");
     } else {
-      suggestBox.classList.add("hidden");
+      box.classList.add("hidden");
     }
   }
 
   function addToOrder() {
-    const rawCode = document.getElementById("nfcInput").value.trim().toUpperCase();
+    const code = document.getElementById("nfcInput").value.trim().toUpperCase();
     const quantity = parseInt(document.getElementById("quantityInput").value);
-    const product = productMap[rawCode] || Object.values(productMap).find(p => p.toLowerCase() === rawCode.toLowerCase());
+    const product = nfcMap[code];
 
     if (!product || isNaN(quantity) || quantity <= 0) {
       alert("Invalid input.");
       return;
     }
 
-    if (quantity > (productStock[product] || 0)) {
-      alert("Not enough stock for " + product);
+    const currentStock = stock[product] || 0;
+    const totalOrdered = currentOrders.reduce((sum, item) => 
+      item.product === product ? sum + item.quantity : sum, 0);
+
+    if (quantity + totalOrdered > currentStock) {
+      alert("Not enough stock!");
       return;
     }
 
@@ -230,7 +253,6 @@
 
     document.getElementById("nfcInput").value = "";
     document.getElementById("quantityInput").value = "";
-    document.getElementById("suggestionBox").classList.add("hidden");
     showOrderSummary();
   }
 
@@ -264,8 +286,8 @@
   function submitOrder() {
     const timestamp = new Date().toLocaleString();
     currentOrders.forEach(item => {
-      productStock[item.product] -= item.quantity;
       serverLogs.push({ ...item, time: timestamp });
+      stock[item.product] -= item.quantity;
     });
     alert("Order submitted!");
     currentOrders = [];
@@ -280,25 +302,21 @@
     });
   }
 
-  function renderStockList() {
-    const stockDiv = document.getElementById("stockList");
-    stockDiv.innerHTML = "";
-    Object.entries(productStock).forEach(([name, qty]) => {
-      const row = document.createElement("div");
-      row.className = "stock-item";
-      row.innerHTML = `
-        ${name}: 
-        <input type="number" value="${qty}" onchange="updateStock('${name}', this.value)" />
-      `;
-      stockDiv.appendChild(row);
-    });
+  function renderStock() {
+    const box = document.getElementById("stockDisplay");
+    box.innerHTML = `<h3>Current Stock</h3>
+      <div class="log-box">
+        Cleanser: ${stock["Cleanser"]}<br>
+        Toner: ${stock["Toner"]}<br>
+        Serum: ${stock["Serum"]}
+      </div>`;
   }
 
-  function updateStock(product, newValue) {
-    const val = parseInt(newValue);
-    if (!isNaN(val) && val >= 0) {
-      productStock[product] = val;
-    }
+  function updateStock(product, amount) {
+    if (isNaN(amount)) return;
+    stock[product] += amount;
+    if (stock[product] < 0) stock[product] = 0;
+    renderStock();
   }
 </script>
 </body>

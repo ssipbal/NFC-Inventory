@@ -1,374 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Smart Inventory System</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun&display=swap" rel="stylesheet" />
-<style>
-  body {
-    font-family: 'Sarabun', sans-serif;
-    margin: 0; padding: 0;
-    background: #f4f4f4;
-    min-height: 100vh;
-    display: flex; flex-direction: column;
-  }
-  header {
-    background: #333; color: white;
-    padding: 1rem;
-    text-align: right;
-  }
-  header label, header select {
-    font-size: 1rem;
-  }
-  main {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 2rem;
-  }
-  h1 {
-    margin-bottom: 2rem;
-    font-weight: 700;
-    font-size: 2.5rem;
-  }
-  .button-group {
-    display: flex;
-    gap: 2rem;
-    width: 320px;
-    justify-content: space-between;
-  }
-  .button-group button {
-    flex: 1;
-    padding: 1.5rem 0;
-    font-size: 1.5rem;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    background: #007bff;
-    color: white;
-    box-shadow: 0 4px 8px rgb(0 0 0 / 0.1);
-    transition: background-color 0.3s ease;
-  }
-  .button-group button:hover {
-    background: #0056b3;
-  }
-  .container {
-    max-width: 640px;
-    width: 100%;
-    background: white;
-    padding: 1.5rem 2rem;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
-  }
-  .hidden {
-    display: none;
-  }
-  label {
-    font-weight: 600;
-    display: block;
-    margin-top: 1rem;
-  }
-  input, select {
-    width: 100%;
-    padding: 0.5rem;
-    margin-top: 0.3rem;
-    font-family: 'Sarabun', sans-serif;
-    font-size: 1rem;
-    box-sizing: border-box;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-  }
-  th, td {
-    padding: 0.6rem;
-    border: 1px solid #ddd;
-    text-align: center;
-  }
-  table input[type=number] {
-    width: 60px;
-    padding: 0.2rem;
-    font-size: 1rem;
-  }
-  .green-btn {
-    background-color: #28a745 !important;
-    color: white;
-    border: none;
-    padding: 0.7rem 1rem;
-    border-radius: 8px;
-    font-size: 1rem;
-    cursor: pointer;
-    margin-top: 1rem;
-    box-shadow: 0 3px 8px rgb(0 128 0 / 0.3);
-    transition: background-color 0.3s ease;
-  }
-  .green-btn:hover {
-    background-color: #1e7e34 !important;
-  }
-  .red-btn {
-    background-color: #dc3545;
-    color: white;
-    border: none;
-    padding: 0.5rem 0.8rem;
-    border-radius: 5px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-  }
-  .red-btn:hover {
-    background-color: #a71d2a;
-  }
-  button:not(.green-btn):not(.red-btn) {
-    margin-top: 1rem;
-    font-size: 1rem;
-    cursor: pointer;
-  }
-  #logList {
-    max-height: 300px;
-    overflow-y: auto;
-    padding-left: 1rem;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Inventory App</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Sarabun', sans-serif;
+    }
+
+    body {
+      background-color: #f3f4f6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding: 20px;
+    }
+
+    .app-container {
+      background: white;
+      padding: 2rem;
+      border-radius: 1.5rem;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+      max-width: 420px;
+      width: 100%;
+    }
+
+    h2 {
+      text-align: center;
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      font-weight: bold;
+      margin-top: 1rem;
+      display: block;
+    }
+
+    input, select {
+      margin-top: 0.5rem;
+      width: 100%;
+      padding: 10px;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 0.5rem;
+    }
+
+    button {
+      margin-top: 1.5rem;
+      width: 100%;
+      padding: 0.75rem;
+      background-color: #10b981;
+      color: white;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #059669;
+    }
+
+    .product-suggestions {
+      margin-top: 0.25rem;
+      list-style: none;
+      border: 1px solid #ddd;
+      max-height: 120px;
+      overflow-y: auto;
+      border-radius: 0.5rem;
+      padding: 0.5rem;
+      display: none;
+      background: white;
+      position: absolute;
+      width: calc(100% - 40px);
+      z-index: 999;
+    }
+
+    .product-suggestions li {
+      padding: 5px;
+      cursor: pointer;
+    }
+
+    .product-suggestions li:hover {
+      background-color: #f0f0f0;
+    }
+
+    .relative {
+      position: relative;
+    }
+  </style>
 </head>
 <body>
-
-<header>
-  <label for="langSelect">Language:</label>
-  <select id="langSelect">
-    <option value="en">English</option>
-    <option value="th">ไทย</option>
-  </select>
-</header>
-
-<main>
-  <!-- MAIN PAGE -->
-  <div id="mainPage" class="container">
-    <h1>Smart Inventory System</h1>
-    <div class="button-group">
-      <button onclick="goToCustomer()">Customer</button>
-      <button onclick="goToAdminLogin()">Admin</button>
-    </div>
+  <div class="app-container">
+    <h2>Scan the Product</h2>
+    <form id="scanForm">
+      <label for="productCode">NFC or Product Search</label>
+      <div class="relative">
+        <input type="text" id="productCode" placeholder="Tap NFC or search for product name (C/T/S)" autocomplete="off" />
+        <ul id="suggestions" class="product-suggestions"></ul>
+      </div>
+      <label for="quantity">Quantity</label>
+      <input type="number" id="quantity" placeholder="Enter quantity" />
+      <button type="submit">Add to Summary</button>
+    </form>
   </div>
 
-  <!-- CUSTOMER PAGE -->
-  <div id="customerPage" class="container hidden">
-    <h2>Scan the product</h2>
-    <label for="nfcInput">Tap NFC or enter product code (C = Cleanser, T = Toner, S = Serum)</label>
-    <input id="nfcInput" type="text" oninput="autoSuggest()" placeholder="Enter NFC code or product code" autocomplete="off" />
-    <label for="quantityInput">Quantity</label>
-    <input id="quantityInput" type="number" min="1" placeholder="Enter quantity" />
-    <button class="green-btn" onclick="addToSummary()">Add to Summary</button>
-    <h3>Order Summary</h3>
-    <table id="summaryTable">
-      <thead>
-        <tr><th>Product</th><th>Quantity</th><th>Unit Price (฿)</th><th>Total Price (฿)</th><th>Actions</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-    <button class="green-btn" onclick="submitOrder()">Submit Order</button>
-    <button onclick="goBackToMain()">Back to Main</button>
-  </div>
+  <script>
+    const suggestionsList = document.getElementById('suggestions');
+    const productInput = document.getElementById('productCode');
+    const productMap = {
+      C: 'Cleanser',
+      T: 'Toner',
+      S: 'Serum'
+    };
 
-  <!-- ADMIN LOGIN PAGE -->
-  <div id="adminLoginPage" class="container hidden">
-    <h2>Admin Login</h2>
-    <input type="password" id="adminPasscode" placeholder="Enter passcode" />
-    <button class="green-btn" onclick="verifyAdminPasscode()">Enter</button>
-    <button onclick="goBackToMain()">Back to Main</button>
-  </div>
+    productInput.addEventListener('input', () => {
+      const value = productInput.value.toUpperCase();
+      suggestionsList.innerHTML = '';
 
-  <!-- ADMIN PAGE -->
-  <div id="adminPage" class="container hidden">
-    <h2>Stock Management</h2>
-    <table id="stockTable">
-      <thead><tr><th>Product</th><th>Stock Quantity</th></tr></thead>
-      <tbody></tbody>
-    </table>
-    <label for="stockProductSelect">Select Product</label>
-    <select id="stockProductSelect">
-      <option value="Cleanser">Cleanser</option>
-      <option value="Toner">Toner</option>
-      <option value="Serum">Serum</option>
-    </select>
-    <label for="stockAmountInput">Amount</label>
-    <input id="stockAmountInput" type="number" min="1" placeholder="Enter amount" />
-    <button class="green-btn" onclick="updateStock('add')">Add Stock</button>
-    <button class="green-btn red-btn" onclick="updateStock('delete')">Delete Stock</button>
-    <br/><br/>
-    <button onclick="goToServerPage()">Server Logs</button>
-    <button onclick="adminLogout()">Logout</button>
-  </div>
-
-  <!-- SERVER PAGE -->
-  <div id="serverPage" class="container hidden">
-    <h2>Server Logs</h2>
-    <div style="max-height: 300px; overflow-y: auto; background: #fafafa; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
-      <ul id="logList" style="list-style:none; padding-left: 10px;"></ul>
-    </div>
-    <button onclick="backToAdminFromServer()">Back to Admin</button>
-  </div>
-</main>
-
-<script>
-  const products = { Cleanser: 10, Toner: 15, Serum: 20 };
-  let stock = { Cleanser: 20, Toner: 15, Serum: 10 };
-  let logs = [];
-  let orderSummary = [];
-
-  function showPage(id) {
-    ['mainPage','customerPage','adminLoginPage','adminPage','serverPage'].forEach(page => {
-      document.getElementById(page).classList.toggle('hidden', page !== id);
-    });
-  }
-
-  // Main page navigation
-  function goToCustomer() {
-    clearCustomerInputs();
-    renderOrderSummary();
-    showPage('customerPage');
-  }
-  function goToAdminLogin() {
-    document.getElementById('adminPasscode').value = '';
-    showPage('adminLoginPage');
-  }
-  function goBackToMain() { showPage('mainPage'); }
-
-  // Admin login check
-  function verifyAdminPasscode() {
-    if(document.getElementById('adminPasscode').value === '12345') {
-      renderStockTable();
-      showPage('adminPage');
-    } else alert('Incorrect passcode!');
-  }
-
-  function renderStockTable() {
-    const tbody = document.querySelector('#stockTable tbody');
-    tbody.innerHTML = '';
-    Object.keys(stock).forEach(p => {
-      tbody.innerHTML += `<tr><td>${p}</td><td>${stock[p]}</td></tr>`;
-    });
-  }
-
-  function updateStock(mode) {
-    const product = document.getElementById('stockProductSelect').value;
-    const amount = parseInt(document.getElementById('stockAmountInput').value);
-    if(!amount || amount < 1) { alert('Enter valid amount'); return; }
-    if(mode === 'add') {
-      stock[product] = (stock[product]||0) + amount;
-      logs.push(`[${new Date().toLocaleString()}] Admin added ${amount} ${product}`);
-    } else {
-      stock[product] = Math.max(0,(stock[product]||0) - amount);
-      logs.push(`[${new Date().toLocaleString()}] Admin deleted ${amount} ${product}`);
-    }
-    renderStockTable();
-    document.getElementById('stockAmountInput').value = '';
-    alert('Stock updated!');
-  }
-
-  function adminLogout() { showPage('mainPage'); }
-
-  // Customer auto-suggest (C,T,S → product)
-  function autoSuggest() {
-    const val = document.getElementById('nfcInput').value.trim().toUpperCase();
-    const map = {C:'Cleanser',T:'Toner',S:'Serum'};
-    if(map[val]) document.getElementById('nfcInput').value = map[val];
-  }
-
-  function addToSummary() {
-    let input = document.getElementById('nfcInput').value.trim();
-    let qty = parseInt(document.getElementById('quantityInput').value);
-    const validProducts = Object.keys(products);
-    const shortMap = {C:'Cleanser',T:'Toner',S:'Serum'};
-
-    if(!input) return alert('Please enter product code or scan NFC.');
-    if(input.length === 1 && shortMap[input.toUpperCase()]) input = shortMap[input.toUpperCase()];
-    if(!validProducts.includes(input)) return alert('Invalid product.');
-    if(!qty || qty < 1) return alert('Enter valid quantity.');
-
-    const idx = orderSummary.findIndex(i => i.product === input);
-    if(idx >= 0) orderSummary[idx].qty += qty;
-    else orderSummary.push({product: input, qty: qty});
-
-    renderOrderSummary();
-    clearCustomerInputs();
-  }
-
-  function renderOrderSummary() {
-    const tbody = document.querySelector('#summaryTable tbody');
-    tbody.innerHTML = '';
-    orderSummary.forEach((item, idx) => {
-      const total = item.qty * products[item.product];
-      tbody.innerHTML += `<tr>
-        <td>${item.product}</td>
-        <td><input type="number" min="1" value="${item.qty}" onchange="editQuantity(${idx}, this.value)" style="width:60px"/></td>
-        <td>${products[item.product]}</td>
-        <td>${total}</td>
-        <td><button class="red-btn" onclick="removeSummaryItem(${idx})">X</button></td>
-      </tr>`;
-    });
-  }
-
-  function editQuantity(idx, val) {
-    val = parseInt(val);
-    if(val > 0) {
-      orderSummary[idx].qty = val;
-      renderOrderSummary();
-    } else alert('Invalid quantity');
-  }
-
-  function removeSummaryItem(idx) {
-    orderSummary.splice(idx,1);
-    renderOrderSummary();
-  }
-
-  function clearCustomerInputs() {
-    document.getElementById('nfcInput').value = '';
-    document.getElementById('quantityInput').value = '';
-  }
-
-  function submitOrder() {
-    if(orderSummary.length === 0) return alert('No items in order summary');
-    for(let item of orderSummary) {
-      if(stock[item.product] === undefined || stock[item.product] < item.qty) {
-        return alert(`Not enough stock for ${item.product}. Available: ${stock[item.product] || 0}`);
+      if (!value) {
+        suggestionsList.style.display = 'none';
+        return;
       }
-    }
-    orderSummary.forEach(item => {
-      stock[item.product] -= item.qty;
-      logs.push(`[${new Date().toLocaleString()}] Customer ordered ${item.product} x${item.qty}`);
+
+      const matches = Object.keys(productMap).filter(code => code.startsWith(value) || productMap[code].toUpperCase().includes(value));
+
+      if (matches.length === 0) {
+        suggestionsList.style.display = 'none';
+        return;
+      }
+
+      suggestionsList.style.display = 'block';
+      matches.forEach(code => {
+        const li = document.createElement('li');
+        li.textContent = `${productMap[code]} (${code})`;
+        li.addEventListener('click', () => {
+          productInput.value = code;
+          suggestionsList.style.display = 'none';
+        });
+        suggestionsList.appendChild(li);
+      });
     });
-    orderSummary = [];
-    renderOrderSummary();
-    renderStockTable();
-    alert('Order submitted successfully!');
-  }
 
-  function goToServerPage() {
-    showPage('serverPage');
-    renderLogs();
-  }
-
-  function backToAdminFromServer() {
-    showPage('adminPage');
-  }
-
-  function renderLogs() {
-    const ul = document.getElementById('logList');
-    ul.innerHTML = '';
-    logs.forEach(log => {
-      const li = document.createElement('li');
-      li.textContent = log;
-      ul.appendChild(li);
+    document.addEventListener('click', (e) => {
+      if (!suggestionsList.contains(e.target) && e.target !== productInput) {
+        suggestionsList.style.display = 'none';
+      }
     });
-  }
 
-  document.getElementById('langSelect').addEventListener('change', () => {
-    alert('Language toggle not implemented yet.');
-  });
-</script>
+    document.getElementById('scanForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const code = productInput.value.trim().toUpperCase();
+      const quantity = parseInt(document.getElementById('quantity').value);
 
+      if (!productMap[code] || isNaN(quantity) || quantity <= 0) {
+        alert('Please enter a valid product and quantity.');
+        return;
+      }
+
+      alert(`Added ${quantity} of ${productMap[code]} to the summary.`);
+      productInput.value = '';
+      document.getElementById('quantity').value = '';
+    });
+  </script>
 </body>
 </html>

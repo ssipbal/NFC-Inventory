@@ -2,273 +2,193 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NFC Inventory Web</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Inventory System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun&display=swap" rel="stylesheet">
   <style>
-    body { font-family: sans-serif; text-align: center; padding: 30px; }
-    .lang { position: absolute; top: 10px; right: 10px; }
-    .page { display: none; }
-    .visible { display: block; }
-    table { margin: auto; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ccc; padding: 8px 12px; }
-    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
-    input[type="text"], input[type="number"] { padding: 6px 10px; font-size: 16px; }
+    body {
+      font-family: 'Sarabun', sans-serif;
+      margin: 0;
+      background: #f8f8f8;
+      color: #333;
+    }
+    header {
+      background: #007bff;
+      color: white;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .container {
+      padding: 2rem;
+    }
+    .btn {
+      padding: 0.5rem 1rem;
+      border: none;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      margin: 0.5rem;
+      border-radius: 5px;
+    }
+    .btn:hover {
+      background: #0056b3;
+    }
+    .card {
+      background: white;
+      padding: 1rem;
+      margin: 1rem 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+    input[type="number"] {
+      width: 60px;
+    }
   </style>
 </head>
 <body>
+  <header>
+    <div>Smart Inventory System</div>
+    <div>
+      <button class="btn" onclick="switchLanguage('en')">EN</button>
+      <button class="btn" onclick="switchLanguage('th')">TH</button>
+    </div>
+  </header>
 
-<div class="lang">
-  <select id="lang" onchange="setLang(this.value)">
-    <option value="en">English</option>
-    <option value="th">ไทย</option>
-  </select>
-</div>
+  <div class="container" id="main-page">
+    <button class="btn" onclick="goToCustomer()">Customer</button>
+    <button class="btn" onclick="goToAdmin()">Admin</button>
+  </div>
 
-<!-- Main Page -->
-<div id="main" class="page visible">
-  <h1 id="title">Select Mode</h1>
-  <button onclick="showPage('customer')">Customer</button>
-  <button onclick="askAdmin()">Admin</button>
-</div>
+  <div class="container" id="customer-page" style="display:none">
+    <h2>Scan the product</h2>
+    <select id="product-select">
+      <option value="">--Select Product--</option>
+      <option value="Cleanser">Cleanser</option>
+      <option value="Toner">Toner</option>
+      <option value="Serum">Serum</option>
+    </select>
+    <input type="number" id="quantity" placeholder="Qty" min="1" />
+    <button class="btn" onclick="addToSummary()">Add</button>
+    <div id="summary" class="card"></div>
+    <button class="btn" onclick="submitOrder()">Submit Order</button>
+  </div>
 
-<!-- Customer Page -->
-<div id="customer" class="page">
-  <h2 id="scanLabel">Scan or Type a Product</h2>
-  <button id="nfcScanBtn" onclick="startNFC()">📶 Scan NFC Tag</button>
-  <br><br>
-  <input list="products" id="productInput" placeholder="Type product name (A, B, C)" autocomplete="off" />
-  <datalist id="products">
-    <option value="Product A (฿10)"></option>
-    <option value="Product B (฿15)"></option>
-    <option value="Product C (฿20)"></option>
-  </datalist>
-  <button onclick="manualSelect()">➕ Add</button>
+  <div class="container" id="admin-login" style="display:none">
+    <input type="password" id="admin-pass" placeholder="Enter passcode" />
+    <button class="btn" onclick="checkAdmin()">Login</button>
+  </div>
 
-  <div id="summary"></div>
-  <button onclick="submitOrder()" id="submitText">Submit Order</button>
-  <br><button onclick="backHome()">⬅️ Back</button>
-</div>
+  <div class="container" id="admin-page" style="display:none">
+    <h2>Stock Control</h2>
+    <div id="stock-control" class="card"></div>
+    <button class="btn" onclick="goToServerPage()">Server</button>
+  </div>
 
-<!-- Admin Page -->
-<div id="admin" class="page">
-  <h2 id="adminStockLabel">Current Stock</h2>
-  <div id="stockTable"></div>
+  <div class="container" id="server-page" style="display:none">
+    <h2>Server Logs</h2>
+    <div id="logs" class="card"></div>
+    <button class="btn" onclick="backToAdmin()">Back</button>
+  </div>
 
-  <h3 id="editStockLabel">Edit Stock</h3>
-  <select id="stockItem">
-    <option value="A">Product A</option>
-    <option value="B">Product B</option>
-    <option value="C">Product C</option>
-  </select>
-  <input type="number" id="stockQty" placeholder="Amount" />
-  <button onclick="addStock()">Add</button>
-  <button onclick="removeStock()">Remove</button>
-  <br><br>
-  <button onclick="showPage('server')">📦 Server</button>
-  <br><button onclick="backHome()">⬅️ Back</button>
-</div>
+  <script>
+    const prices = { Cleanser: 10, Toner: 15, Serum: 20 };
+    const summary = [];
+    const stock = { Cleanser: 100, Toner: 100, Serum: 100 };
+    const logs = [];
 
-<!-- Server Page -->
-<div id="server" class="page">
-  <h2>📋 Server Log</h2>
-  <div id="logBox" style="max-height: 400px; overflow-y: auto; text-align: left; margin: 0 auto; width: 90%;"></div>
-  <br><button onclick="backHome()">⬅️ Back</button>
-</div>
-
-<script>
-  const i18n = {
-    en: {
-      title: "Select Mode", scan: "Scan or Type a Product", submit: "Submit Order",
-      adminStock: "Current Stock", editStock: "Edit Stock"
-    },
-    th: {
-      title: "เลือกโหมด", scan: "สแกนหรือพิมพ์ชื่อสินค้า", submit: "ยืนยันคำสั่งซื้อ",
-      adminStock: "สินค้าคงคลัง", editStock: "แก้ไขสต็อก"
+    function switchLanguage(lang) {
+      alert('Switching to ' + lang);
     }
-  };
 
-  function setLang(lang) {
-    localStorage.setItem("lang", lang);
-    document.getElementById("title").innerText = i18n[lang].title;
-    document.getElementById("scanLabel").innerText = i18n[lang].scan;
-    document.getElementById("submitText").innerText = i18n[lang].submit;
-    document.getElementById("adminStockLabel").innerText = i18n[lang].adminStock;
-    document.getElementById("editStockLabel").innerText = i18n[lang].editStock;
-  }
-
-  setLang(localStorage.getItem("lang") || "en");
-  document.getElementById("lang").value = localStorage.getItem("lang") || "en";
-
-  const products = {
-    "04A2242B7C2980": { name: "Product A", price: 10, key: "A" },
-    "047F58A47C2980": { name: "Product B", price: 15, key: "B" },
-    "04B3192B7C2980": { name: "Product C", price: 20, key: "C" }
-  };
-
-  // For autocomplete (map short names or full product names)
-  const nameMap = {
-    "Product A": products["04A2242B7C2980"],
-    "Product B": products["047F58A47C2980"],
-    "Product C": products["04B3192B7C2980"]
-  };
-
-  let stock = { A: 10, B: 10, C: 10 };
-  let order = [];
-  let logs = [];
-
-  function showPage(id) {
-    document.querySelectorAll(".page").forEach(p => p.classList.remove("visible"));
-    document.getElementById(id).classList.add("visible");
-    if (id === "admin") updateStockView();
-    if (id === "server") updateLogView();
-    if (id === "customer") updateSummary();
-  }
-
-  function backHome() {
-    showPage("main");
-  }
-
-  function askAdmin() {
-    const pass = prompt("Enter Admin Passcode:");
-    if (pass === "12345") showPage("admin");
-    else alert("Incorrect passcode");
-  }
-
-  // NFC scanning
-  async function startNFC() {
-    if (!("NDEFReader" in window)) {
-      alert("Web NFC is not supported on this device/browser.");
-      return;
+    function goToCustomer() {
+      document.getElementById('main-page').style.display = 'none';
+      document.getElementById('customer-page').style.display = 'block';
     }
-    const nfcScanBtn = document.getElementById("nfcScanBtn");
-    nfcScanBtn.disabled = true;
-    nfcScanBtn.textContent = "📶 Scanning...";
-    try {
-      const ndef = new NDEFReader();
-      await ndef.scan();
-      ndef.onreadingerror = () => {
-        alert("NFC reading error. Please try again.");
-        nfcScanBtn.disabled = false;
-        nfcScanBtn.textContent = "📶 Scan NFC Tag";
-      };
-      ndef.onreading = event => {
-        const tagId = [...event.serialNumber].map(b => b.toString(16).padStart(2,"0")).join("").toUpperCase();
-        // Some devices report serialNumber differently; fallback to event.serialNumber directly:
-        const id = event.serialNumber ? event.serialNumber.toUpperCase() : tagId;
-        processNfcId(id);
-        nfcScanBtn.disabled = false;
-        nfcScanBtn.textContent = "📶 Scan NFC Tag";
-      };
-    } catch(error) {
-      alert("NFC scan failed or canceled: " + error);
-      nfcScanBtn.disabled = false;
-      nfcScanBtn.textContent = "📶 Scan NFC Tag";
+
+    function goToAdmin() {
+      document.getElementById('main-page').style.display = 'none';
+      document.getElementById('admin-login').style.display = 'block';
     }
-  }
 
-  function processNfcId(nfcID) {
-    if (!products[nfcID]) {
-      alert("Unknown NFC Tag: " + nfcID);
-      return;
+    function checkAdmin() {
+      const pass = document.getElementById('admin-pass').value;
+      if (pass === '12345') {
+        document.getElementById('admin-login').style.display = 'none';
+        document.getElementById('admin-page').style.display = 'block';
+        renderStock();
+      } else {
+        alert('Wrong passcode');
+      }
     }
-    const product = products[nfcID];
-    const qty = parseInt(prompt(`Enter quantity for ${product.name}`));
-    if (!qty || qty <= 0) return;
-    order.push({ ...product, qty });
-    updateSummary();
-  }
 
-  // Manual autocomplete select
-  function manualSelect() {
-    const input = document.getElementById("productInput").value.trim();
-    if (!input) return;
-    // Extract product name only from input, e.g. "Product A (฿10)" → "Product A"
-    const matched = input.match(/^Product [ABC]/i);
-    if (!matched) {
-      alert("Invalid product name. Type A, B, or C.");
-      return;
+    function renderStock() {
+      const container = document.getElementById('stock-control');
+      container.innerHTML = '';
+      for (let key in stock) {
+        container.innerHTML += `${key}: ${stock[key]}<br/>`;
+      }
     }
-    const productName = matched[0];
-    const product = nameMap[productName];
-    if (!product) {
-      alert("Product not found.");
-      return;
+
+    function addToSummary() {
+      const product = document.getElementById('product-select').value;
+      const qty = parseInt(document.getElementById('quantity').value);
+      if (!product || !qty || qty <= 0) return alert('Invalid input');
+      summary.push({ product, qty, price: prices[product] });
+      renderSummary();
     }
-    const qty = parseInt(prompt(`Enter quantity for ${product.name}`));
-    if (!qty || qty <= 0) return;
-    order.push({ ...product, qty });
-    updateSummary();
-    // Clear input after adding
-    document.getElementById("productInput").value = "";
-  }
 
-  function updateSummary() {
-    if(order.length === 0) {
-      document.getElementById("summary").innerHTML = "<p><em>No items added yet.</em></p>";
-      return;
+    function renderSummary() {
+      const div = document.getElementById('summary');
+      div.innerHTML = '<h3>Order Summary</h3><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Edit</th></tr>';
+      summary.forEach((item, i) => {
+        div.innerHTML += `<tr><td>${item.product}</td><td><input type='number' value='${item.qty}' min='1' onchange='editQty(${i}, this.value)'/></td><td>${item.qty * item.price} THB</td><td><button onclick='removeItem(${i})'>X</button></td></tr>`;
+      });
+      div.innerHTML += '</table>';
     }
-    let html = "<h3>Summary</h3><table><tr><th>Item</th><th>Qty</th><th>Price</th></tr>";
-    order.forEach(o => {
-      html += `<tr><td>${o.name}</td><td>${o.qty}</td><td>฿${o.qty * o.price}</td></tr>`;
-    });
-    html += "</table>";
-    document.getElementById("summary").innerHTML = html;
-  }
 
-  function submitOrder() {
-    if(order.length === 0) {
-      alert("No items to submit.");
-      return;
+    function editQty(index, newQty) {
+      summary[index].qty = parseInt(newQty);
+      renderSummary();
     }
-    order.forEach(o => {
-      stock[o.key] = (stock[o.key] || 0) - o.qty;
-      logs.push(`${timestamp()} [Customer] Ordered ${o.qty}x ${o.name}`);
-    });
-    alert("Order Submitted!");
-    order = [];
-    updateSummary();
-  }
 
-  function updateStockView() {
-    let html = "<table><tr><th>Item</th><th>Quantity</th></tr>";
-    Object.entries(stock).forEach(([key, qty]) => {
-      html += `<tr><td>Product ${key}</td><td>${qty}</td></tr>`;
-    });
-    html += "</table>";
-    document.getElementById("stockTable").innerHTML = html;
-  }
-
-  function addStock() {
-    const key = document.getElementById("stockItem").value;
-    const qty = parseInt(document.getElementById("stockQty").value);
-    if (!qty || qty <= 0) return alert("Enter valid amount > 0");
-    stock[key] = (stock[key] || 0) + qty;
-    logs.push(`${timestamp()} [Admin] Added ${qty}x Product ${key}`);
-    updateStockView();
-  }
-
-  function removeStock() {
-    const key = document.getElementById("stockItem").value;
-    const qty = parseInt(document.getElementById("stockQty").value);
-    if (!qty || qty <= 0) return alert("Enter valid amount > 0");
-    stock[key] = Math.max(0, (stock[key] || 0) - qty);
-    logs.push(`${timestamp()} [Admin] Removed ${qty}x Product ${key}`);
-    updateStockView();
-  }
-
-  function updateLogView() {
-    if(logs.length === 0) {
-      document.getElementById("logBox").innerHTML = "<p><em>No logs yet.</em></p>";
-      return;
+    function removeItem(index) {
+      summary.splice(index, 1);
+      renderSummary();
     }
-    document.getElementById("logBox").innerHTML = logs.map(log => `<div>${log}</div>`).join("");
-  }
 
-  function timestamp() {
-    const d = new Date();
-    return d.toLocaleString();
-  }
-</script>
+    function submitOrder() {
+      const now = new Date().toLocaleString();
+      summary.forEach(item => {
+        stock[item.product] -= item.qty;
+        logs.push(`[${now}] Customer ordered ${item.qty} ${item.product}`);
+      });
+      summary.length = 0;
+      renderSummary();
+      alert('Order submitted!');
+    }
 
+    function goToServerPage() {
+      document.getElementById('admin-page').style.display = 'none';
+      document.getElementById('server-page').style.display = 'block';
+      const logsDiv = document.getElementById('logs');
+      logsDiv.innerHTML = logs.join('<br/>');
+    }
+
+    function backToAdmin() {
+      document.getElementById('server-page').style.display = 'none';
+      document.getElementById('admin-page').style.display = 'block';
+    }
+  </script>
 </body>
 </html>

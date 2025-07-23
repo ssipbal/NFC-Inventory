@@ -2,175 +2,261 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Inventory App</title>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Development of Web-Based Smart Inventory Management Systems via NFC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
   <style>
     * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
       font-family: 'Sarabun', sans-serif;
+      box-sizing: border-box;
     }
-
     body {
-      background-color: #f3f4f6;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      padding: 20px;
+      margin: 0;
+      background: #f8f9fa;
+      color: #212529;
     }
-
     .app-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    .card {
       background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       padding: 2rem;
-      border-radius: 1.5rem;
-      box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+      width: 100%;
       max-width: 420px;
-      width: 100%;
     }
-
     h2 {
-      text-align: center;
+      margin-top: 0;
       font-size: 1.5rem;
-      margin-bottom: 1.5rem;
+      text-align: center;
     }
-
-    label {
-      font-weight: bold;
-      margin-top: 1rem;
-      display: block;
-    }
-
-    input, select {
-      margin-top: 0.5rem;
-      width: 100%;
-      padding: 10px;
-      font-size: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 0.5rem;
-    }
-
-    button {
-      margin-top: 1.5rem;
+    input, button, select {
       width: 100%;
       padding: 0.75rem;
-      background-color: #10b981;
+      margin-top: 1rem;
+      font-size: 1rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background-color: #007bff;
       color: white;
       border: none;
-      border-radius: 0.5rem;
-      font-size: 1rem;
       cursor: pointer;
-      transition: background-color 0.3s;
     }
-
     button:hover {
-      background-color: #059669;
+      background-color: #0056b3;
     }
-
-    .product-suggestions {
-      margin-top: 0.25rem;
-      list-style: none;
-      border: 1px solid #ddd;
-      max-height: 120px;
-      overflow-y: auto;
-      border-radius: 0.5rem;
-      padding: 0.5rem;
+    .summary {
+      margin-top: 2rem;
+    }
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .summary-item input {
+      width: 50px;
+      margin-left: 10px;
+    }
+    .tag {
+      font-size: 0.9rem;
+      margin-top: 1rem;
+      color: gray;
+    }
+    .nav-toggle {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 2rem;
+    }
+    .nav-toggle button {
+      width: 45%;
+    }
+    .hidden {
       display: none;
-      background: white;
-      position: absolute;
-      width: calc(100% - 40px);
-      z-index: 999;
     }
-
-    .product-suggestions li {
-      padding: 5px;
-      cursor: pointer;
-    }
-
-    .product-suggestions li:hover {
-      background-color: #f0f0f0;
-    }
-
-    .relative {
-      position: relative;
+    .log-box {
+      background: #f1f3f5;
+      padding: 0.5rem;
+      margin-top: 1rem;
+      border-radius: 6px;
     }
   </style>
 </head>
 <body>
-  <div class="app-container">
-    <h2>Scan the Product</h2>
-    <form id="scanForm">
-      <label for="productCode">NFC or Product Search</label>
-      <div class="relative">
-        <input type="text" id="productCode" placeholder="Tap NFC or search for product name (C/T/S)" autocomplete="off" />
-        <ul id="suggestions" class="product-suggestions"></ul>
-      </div>
-      <label for="quantity">Quantity</label>
-      <input type="number" id="quantity" placeholder="Enter quantity" />
-      <button type="submit">Add to Summary</button>
-    </form>
+<div class="app-container">
+  <div class="card" id="mainCard">
+    <div class="nav-toggle">
+      <button onclick="showCustomer()">Customer</button>
+      <button onclick="showAdmin()">Admin</button>
+    </div>
+
+    <!-- CUSTOMER PAGE -->
+    <div id="customerPage" class="hidden">
+      <h2>Scan the Product</h2>
+      <div class="tag">Tap NFC or search (C = Cleanser, T = Toner, S = Serum)</div>
+      <input id="nfcInput" placeholder="Enter NFC code or product letter" oninput="showSuggestions(this.value)" />
+      <div id="suggestBox" class="log-box hidden"></div>
+      <input id="quantityInput" placeholder="Enter quantity" type="number" />
+      <button onclick="addToOrder()">Add to Summary</button>
+
+      <div class="summary" id="summaryList"></div>
+      <button onclick="submitOrder()">Submit Order</button>
+    </div>
+
+    <!-- ADMIN LOGIN -->
+    <div id="adminLogin" class="hidden">
+      <h2>Admin Login</h2>
+      <input id="adminCode" placeholder="Enter code" type="password" />
+      <button onclick="checkAdmin()">Enter</button>
+    </div>
+
+    <!-- ADMIN PAGE -->
+    <div id="adminPage" class="hidden">
+      <h2>Admin Panel</h2>
+      <button onclick="showServer()">View Server Logs</button>
+    </div>
+
+    <!-- SERVER PAGE -->
+    <div id="serverPage" class="hidden">
+      <h2>Server Logs</h2>
+      <div id="serverLogs" class="log-box"></div>
+      <button onclick="backToAdmin()">Back</button>
+    </div>
   </div>
+</div>
 
-  <script>
-    const suggestionsList = document.getElementById('suggestions');
-    const productInput = document.getElementById('productCode');
-    const productMap = {
-      C: 'Cleanser',
-      T: 'Toner',
-      S: 'Serum'
-    };
+<script>
+  const productMap = {
+    C: "Cleanser",
+    T: "Toner",
+    S: "Serum"
+  };
 
-    productInput.addEventListener('input', () => {
-      const value = productInput.value.toUpperCase();
-      suggestionsList.innerHTML = '';
+  let currentOrders = [];
+  let serverLogs = [];
 
-      if (!value) {
-        suggestionsList.style.display = 'none';
-        return;
-      }
+  function showCustomer() {
+    hideAll();
+    document.getElementById("customerPage").classList.remove("hidden");
+  }
 
-      const matches = Object.keys(productMap).filter(code => code.startsWith(value) || productMap[code].toUpperCase().includes(value));
+  function showAdmin() {
+    hideAll();
+    document.getElementById("adminLogin").classList.remove("hidden");
+  }
 
-      if (matches.length === 0) {
-        suggestionsList.style.display = 'none';
-        return;
-      }
+  function checkAdmin() {
+    const pass = document.getElementById("adminCode").value;
+    if (pass === "12345") {
+      hideAll();
+      document.getElementById("adminPage").classList.remove("hidden");
+    } else {
+      alert("Wrong code");
+    }
+  }
 
-      suggestionsList.style.display = 'block';
-      matches.forEach(code => {
-        const li = document.createElement('li');
-        li.textContent = `${productMap[code]} (${code})`;
-        li.addEventListener('click', () => {
-          productInput.value = code;
-          suggestionsList.style.display = 'none';
-        });
-        suggestionsList.appendChild(li);
-      });
+  function showServer() {
+    hideAll();
+    document.getElementById("serverPage").classList.remove("hidden");
+    renderLogs();
+  }
+
+  function backToAdmin() {
+    hideAll();
+    document.getElementById("adminPage").classList.remove("hidden");
+  }
+
+  function hideAll() {
+    document.getElementById("customerPage").classList.add("hidden");
+    document.getElementById("adminLogin").classList.add("hidden");
+    document.getElementById("adminPage").classList.add("hidden");
+    document.getElementById("serverPage").classList.add("hidden");
+  }
+
+  function showSuggestions(value) {
+    const box = document.getElementById("suggestBox");
+    const key = value.toUpperCase();
+    if (productMap[key]) {
+      box.classList.remove("hidden");
+      box.innerText = "Did you mean: " + productMap[key] + "?";
+    } else {
+      box.classList.add("hidden");
+    }
+  }
+
+  function addToOrder() {
+    const code = document.getElementById("nfcInput").value.toUpperCase();
+    const quantity = parseInt(document.getElementById("quantityInput").value);
+    const product = productMap[code];
+
+    if (!product || isNaN(quantity) || quantity <= 0) {
+      alert("Invalid input.");
+      return;
+    }
+
+    const existing = currentOrders.find(item => item.product === product);
+    if (existing) {
+      existing.quantity += quantity;
+    } else {
+      currentOrders.push({ product, quantity });
+    }
+
+    document.getElementById("nfcInput").value = "";
+    document.getElementById("quantityInput").value = "";
+    showOrderSummary();
+  }
+
+  function showOrderSummary() {
+    const list = document.getElementById("summaryList");
+    list.innerHTML = "";
+    currentOrders.forEach((item, idx) => {
+      const row = document.createElement("div");
+      row.className = "summary-item";
+      row.innerHTML = `
+        ${item.product}: 
+        <input type="number" value="${item.quantity}" onchange="editQuantity(${idx}, this.value)" />
+        <button onclick="removeItem(${idx})">🗑</button>
+      `;
+      list.appendChild(row);
     });
+  }
 
-    document.addEventListener('click', (e) => {
-      if (!suggestionsList.contains(e.target) && e.target !== productInput) {
-        suggestionsList.style.display = 'none';
-      }
+  function editQuantity(index, value) {
+    const qty = parseInt(value);
+    if (!isNaN(qty) && qty > 0) {
+      currentOrders[index].quantity = qty;
+    }
+  }
+
+  function removeItem(index) {
+    currentOrders.splice(index, 1);
+    showOrderSummary();
+  }
+
+  function submitOrder() {
+    const timestamp = new Date().toLocaleString();
+    currentOrders.forEach(item => {
+      serverLogs.push({ ...item, time: timestamp });
     });
+    alert("Order submitted!");
+    currentOrders = [];
+    showOrderSummary();
+  }
 
-    document.getElementById('scanForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const code = productInput.value.trim().toUpperCase();
-      const quantity = parseInt(document.getElementById('quantity').value);
-
-      if (!productMap[code] || isNaN(quantity) || quantity <= 0) {
-        alert('Please enter a valid product and quantity.');
-        return;
-      }
-
-      alert(`Added ${quantity} of ${productMap[code]} to the summary.`);
-      productInput.value = '';
-      document.getElementById('quantity').value = '';
+  function renderLogs() {
+    const box = document.getElementById("serverLogs");
+    box.innerHTML = "";
+    serverLogs.forEach(log => {
+      box.innerHTML += `${log.time}: ${log.product} x ${log.quantity}<br>`;
     });
-  </script>
+  }
+</script>
 </body>
 </html>

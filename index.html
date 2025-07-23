@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Smart Inventory</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Sarabun&display=swap');
@@ -32,6 +32,7 @@
     }
     h2, h3 {
       text-align: center;
+      margin-top: 0;
     }
     button {
       padding: 10px 15px;
@@ -41,6 +42,10 @@
       border-radius: 5px;
       cursor: pointer;
       margin: 5px;
+      transition: background-color 0.2s ease;
+    }
+    button:hover {
+      background: #005a9e;
     }
     input[type="number"], input[type="password"] {
       width: 100%;
@@ -49,18 +54,28 @@
       margin-bottom: 10px;
       border: 1px solid #ccc;
       border-radius: 5px;
+      font-size: 1rem;
     }
-    .row { display: flex; justify-content: space-around; margin: 20px 0; }
+    .row { display: flex; justify-content: center; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     td, th {
       border: 1px solid #ccc;
       padding: 8px;
       text-align: center;
+      font-size: 1rem;
+    }
+    .small-btn {
+      padding: 5px 8px;
+      font-size: 0.9rem;
+    }
+    #summary table td:nth-child(3), #summary table td:nth-child(2) {
+      width: 80px;
     }
   </style>
 </head>
 <body>
 
+<!-- Main Landing Page -->
 <div class="container" id="mainPage">
   <h2>Smart Inventory</h2>
   <div class="row">
@@ -69,34 +84,44 @@
   </div>
 </div>
 
+<!-- Customer Page -->
 <div class="container hidden" id="customerPage">
   <h3>Customer: Scan Product</h3>
-  <button onclick="startNFC()">📱 Scan NFC</button>
+  <div class="row">
+    <button onclick="startNFC()">📱 Scan NFC</button>
+    <button onclick="submitOrder()">Submit Order</button>
+    <button onclick="goBack()">Back</button>
+  </div>
   <div id="summary"></div>
-  <button onclick="submitOrder()">Submit Order</button>
-  <button onclick="goBack()">Back</button>
 </div>
 
+<!-- Admin Login -->
 <div class="container hidden" id="adminLogin">
   <h3>Enter Admin Passcode</h3>
   <input type="password" id="adminPass" placeholder="Enter Passcode" />
   <button onclick="checkAdmin()">Login</button>
-</div>
-
-<div class="container hidden" id="adminPage">
-  <h3>Admin Panel</h3>
-  <div id="stockTable"></div>
-  <button onclick="showServer()">Server Page</button>
   <button onclick="goBack()">Back</button>
 </div>
 
+<!-- Admin Page -->
+<div class="container hidden" id="adminPage">
+  <h3>Admin Panel</h3>
+  <div id="stockTable"></div>
+  <div class="row">
+    <button onclick="showServer()">Server Page</button>
+    <button onclick="goBack()">Back</button>
+  </div>
+</div>
+
+<!-- Server Log Page -->
 <div class="container hidden" id="serverPage">
   <h3>Server Log</h3>
-  <div id="serverLog"></div>
+  <div id="serverLog" style="max-height: 400px; overflow-y: auto; font-size: 0.95rem;"></div>
   <button onclick="backToAdmin()">← Back to Admin</button>
 </div>
 
 <script>
+  // Product Map with colons in NFC tag IDs
   const productMap = {
     "04:A1:1F:89:32:02:89": { name: "Cleanser", price: 10 },
     "04:F1:45:8B:32:02:89": { name: "Toner", price: 15 },
@@ -105,12 +130,14 @@
 
   let order = [];
 
+  // Load stock from localStorage or default stock
   const stock = JSON.parse(localStorage.getItem("stock")) || {
     "Cleanser": 50,
     "Toner": 50,
     "Serum": 50
   };
 
+  // Load logs from localStorage or empty
   const logs = JSON.parse(localStorage.getItem("logs")) || [];
 
   function saveStock() {
@@ -119,6 +146,10 @@
 
   function saveLogs() {
     localStorage.setItem("logs", JSON.stringify(logs));
+  }
+
+  function hideAll() {
+    document.querySelectorAll(".container").forEach(el => el.classList.add("hidden"));
   }
 
   function showCustomer() {
@@ -130,12 +161,16 @@
   function showAdminLogin() {
     hideAll();
     document.getElementById("adminLogin").classList.remove("hidden");
+    document.getElementById("adminPass").value = "";
   }
 
   function checkAdmin() {
     const pass = document.getElementById("adminPass").value;
-    if (pass === "12345") showAdmin();
-    else alert("Wrong passcode!");
+    if (pass === "12345") {
+      showAdmin();
+    } else {
+      alert("Wrong passcode!");
+    }
   }
 
   function showAdmin() {
@@ -160,22 +195,34 @@
     document.getElementById("adminPage").classList.remove("hidden");
   }
 
-  function hideAll() {
-    document.querySelectorAll(".container").forEach(el => el.classList.add("hidden"));
-  }
-
+  // Start NFC Scan and match ignoring colons
   function startNFC() {
     if ("NDEFReader" in window) {
       const reader = new NDEFReader();
       reader.scan().then(() => {
         reader.onreading = (event) => {
-          const id = event.serialNumber;
-          if (productMap[id]) {
-            const product = productMap[id];
-            const qty = parseInt(prompt(`Enter quantity for ${product.name}`));
-            if (!isNaN(qty)) {
+          let id = event.serialNumber.toUpperCase().replace(/:/g, "");
+          // Find product ignoring colons in keys
+          const entry = Object.entries(productMap).find(([key]) => key.toUpperCase().replace(/:/g, "") === id);
+          if (entry) {
+            const product = entry[1];
+            if(stock[product.name] <= 0) {
+              alert(`${product.name} is out of stock!`);
+              return;
+            }
+            const qtyStr = prompt(`Enter quantity for ${product.name} (Available: ${stock[product.name]})`, "1");
+            const qty = parseInt(qtyStr);
+            if (!isNaN(qty) && qty > 0) {
+              if(qty > stock[product.name]) {
+                alert(`Cannot order more than available stock (${stock[product.name]})`);
+                return;
+              }
               const existing = order.find(item => item.name === product.name);
               if (existing) {
+                if(existing.qty + qty > stock[product.name]){
+                  alert(`Total quantity exceeds available stock (${stock[product.name]})`);
+                  return;
+                }
                 existing.qty += qty;
               } else {
                 order.push({ name: product.name, qty: qty, price: product.price });
@@ -186,7 +233,7 @@
             alert("Unrecognized product!");
           }
         };
-      }).catch(err => alert("NFC not available: " + err));
+      }).catch(err => alert("NFC scan failed or canceled: " + err));
     } else {
       alert("NFC not supported on this device.");
     }
@@ -195,6 +242,10 @@
   function updateSummary() {
     const div = document.getElementById("summary");
     div.innerHTML = "<h4>Order Summary</h4>";
+    if(order.length === 0){
+      div.innerHTML += "<p>No items added.</p>";
+      return;
+    }
     let table = "<table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Action</th></tr>";
     order.forEach((item, index) => {
       table += `<tr>
@@ -202,8 +253,8 @@
         <td>${item.qty}</td>
         <td>${item.qty * item.price} ฿</td>
         <td>
-          <button onclick="editItem(${index})">Edit</button>
-          <button onclick="removeItem(${index})">Delete</button>
+          <button class="small-btn" onclick="editItem(${index})">Edit</button>
+          <button class="small-btn" onclick="removeItem(${index})">Delete</button>
         </td>
       </tr>`;
     });
@@ -212,10 +263,15 @@
   }
 
   function editItem(i) {
-    const qty = parseInt(prompt("New quantity:", order[i].qty));
-    if (!isNaN(qty)) {
+    const currentQty = order[i].qty;
+    const maxQty = stock[order[i].name];
+    const qtyStr = prompt(`Edit quantity for ${order[i].name} (Available: ${maxQty})`, currentQty);
+    const qty = parseInt(qtyStr);
+    if (!isNaN(qty) && qty > 0 && qty <= maxQty) {
       order[i].qty = qty;
       updateSummary();
+    } else {
+      alert(`Enter a valid quantity (1 to ${maxQty})`);
     }
   }
 
@@ -225,7 +281,18 @@
   }
 
   function submitOrder() {
-    if (order.length === 0) return alert("No order to submit.");
+    if (order.length === 0) {
+      alert("No order to submit.");
+      return;
+    }
+    // Check stock availability one more time before submit
+    for (const item of order) {
+      if (stock[item.name] < item.qty) {
+        alert(`Not enough stock for ${item.name}. Please adjust your order.`);
+        return;
+      }
+    }
+
     const timestamp = new Date().toLocaleString();
     logs.push({ type: "Order", timestamp, details: JSON.parse(JSON.stringify(order)) });
     order.forEach(item => {
@@ -235,20 +302,20 @@
     saveLogs();
     order = [];
     updateSummary();
-    alert("Order submitted!");
+    alert("Order submitted successfully!");
   }
 
   function renderStock() {
     const div = document.getElementById("stockTable");
-    let html = "<table><tr><th>Product</th><th>Stock</th><th>Adjust</th></tr>";
+    let html = "<table><tr><th>Product</th><th>Stock</th><th>Adjust Stock</th></tr>";
     Object.keys(stock).forEach(key => {
       html += `<tr>
         <td>${key}</td>
         <td>${stock[key]}</td>
         <td>
-          <input type="number" id="qty-${key}" placeholder="Enter amount">
-          <button onclick="adjustStock('${key}', true)">Add</button>
-          <button onclick="adjustStock('${key}', false)">Remove</button>
+          <input type="number" min="1" id="qty-${key}" placeholder="Amount" />
+          <button class="small-btn" onclick="adjustStock('${key}', true)">Add</button>
+          <button class="small-btn" onclick="adjustStock('${key}', false)">Remove</button>
         </td>
       </tr>`;
     });
@@ -257,8 +324,13 @@
   }
 
   function adjustStock(name, add) {
-    const val = parseInt(document.getElementById(`qty-${name}`).value);
-    if (!isNaN(val)) {
+    const input = document.getElementById(`qty-${name}`);
+    const val = parseInt(input.value);
+    if (!isNaN(val) && val > 0) {
+      if(!add && val > stock[name]){
+        alert(`Cannot remove more than current stock (${stock[name]})`);
+        return;
+      }
       stock[name] += add ? val : -val;
       const timestamp = new Date().toLocaleString();
       logs.push({
@@ -269,17 +341,27 @@
       saveStock();
       saveLogs();
       renderStock();
-    } else alert("Enter valid quantity");
+      input.value = "";
+    } else {
+      alert("Please enter a valid positive number.");
+    }
   }
 
   function renderLogs() {
     const div = document.getElementById("serverLog");
     div.innerHTML = "";
+    if(logs.length === 0){
+      div.innerHTML = "<p>No logs available.</p>";
+      return;
+    }
+    // Show newest logs first
     logs.slice().reverse().forEach(log => {
-      const entry = `<div style="margin-bottom:10px">
-        <b>${log.type}</b> - ${log.timestamp}<br/>
-        ${log.details.map(d => `${d.name} (${d.qty})`).join(", ")}
-      </div>`;
+      const entries = log.details.map(d => `${d.name} (${d.qty})`).join(", ");
+      const entry = `
+        <div style="margin-bottom:10px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+          <b>${log.type}</b> - ${log.timestamp}<br/>
+          ${entries}
+        </div>`;
       div.innerHTML += entry;
     });
   }

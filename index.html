@@ -157,9 +157,10 @@
 </div>
 
 <script>
+  // <-- REPLACE this with your actual deployed Google Apps Script Web App URL -->
   const GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbw81KgdkC35-8VzaCaU43D_7HtYJQYZdSK3pzR7o1j2czttV-ovZk9jATMzjNTb2eMHXg/exec";
 
-  // Product Map with colons in NFC tag IDs
+  // Product Map without colons in keys (keys normalized to uppercase with no colons)
   const productMap = {
     "04:A1:1F:89:32:02:89": { name: "Cleanser", price: 10 },
     "04:F1:45:8B:32:02:89": { name: "Toner", price: 15 },
@@ -170,11 +171,16 @@
   let stock = {};
   let logs = [];
 
-  // Order counter for daily reset (stored locally since Google Sheets doesn't track this)
-  let orderCounterData = JSON.parse(localStorage.getItem("orderCounterData")) || {
-    date: null,
-    count: 0
-  };
+  // Order counter for daily reset (stored locally)
+  let orderCounterData = null;
+  try {
+    orderCounterData = JSON.parse(localStorage.getItem("orderCounterData"));
+  } catch {
+    orderCounterData = null;
+  }
+  if(!orderCounterData || typeof orderCounterData !== 'object' || !orderCounterData.date || !orderCounterData.count) {
+    orderCounterData = { date: null, count: 0 };
+  }
 
   // ====== GOOGLE SHEETS API FUNCTIONS =======
 
@@ -182,6 +188,7 @@
   async function loadStockFromSheet() {
     try {
       const res = await fetch(`${GOOGLE_SHEET_API}?sheet=Stock`);
+      if(!res.ok) throw new Error(`HTTP error ${res.status}`);
       const data = await res.json();
       stock = {};
       data.forEach(item => {
@@ -189,6 +196,7 @@
       });
     } catch (e) {
       alert("Failed to load stock from Google Sheets: " + e.message);
+      stock = {};
     }
   }
 
@@ -196,13 +204,19 @@
   async function loadLogsFromSheet() {
     try {
       const res = await fetch(`${GOOGLE_SHEET_API}?sheet=Logs`);
+      if(!res.ok) throw new Error(`HTTP error ${res.status}`);
       const data = await res.json();
-      // Parse JSON string Details back to object
       logs = data.map(log => ({
         type: log.Type,
         timestamp: log.Timestamp,
         orderNumber: log.OrderNumber,
-        details: JSON.parse(log.Details || "[]")
+        details: (() => {
+          try {
+            return JSON.parse(log.Details || "[]");
+          } catch {
+            return [];
+          }
+        })()
       }));
     } catch (e) {
       alert("Failed to load logs from Google Sheets: " + e.message);
@@ -219,10 +233,12 @@
         body: JSON.stringify({ action: "updateStock", stock: stockArray }),
         headers: { "Content-Type": "application/json" }
       });
+      if(!res.ok) throw new Error(`HTTP error ${res.status}`);
       const json = await res.json();
       if(json.status !== "success") throw new Error("Failed to save stock");
     } catch (e) {
       alert("Failed to save stock to Google Sheets: " + e.message);
+      throw e;
     }
   }
 
@@ -234,12 +250,13 @@
         body: JSON.stringify({ action: "addLog", log }),
         headers: { "Content-Type": "application/json" }
       });
+      if(!res.ok) throw new Error(`HTTP error ${res.status}`);
       const json = await res.json();
       if(json.status !== "success") throw new Error("Failed to save log");
-      // Also push locally for UI updates without reloading
-      logs.push(log);
+      logs.push(log); // Also push locally for UI updates without reloading
     } catch (e) {
       alert("Failed to save log to Google Sheets: " + e.message);
+      throw e;
     }
   }
 
@@ -298,16 +315,16 @@
     document.getElementById("mainPage").classList.remove("hidden");
   }
 
-  // NFC scan (same as before)
+  // NFC scan
   function startNFC() {
     if ("NDEFReader" in window) {
       const reader = new NDEFReader();
       reader.scan().then(() => {
         reader.onreading = (event) => {
-          let id = event.serialNumber.toUpperCase().replace(/:/g, "");
-          const entry = Object.entries(productMap).find(([key]) => key.toUpperCase().replace(/:/g, "") === id);
-          if (entry) {
-            const product = entry[1];
+          // Normalize serialNumber: uppercase, remove colons
+          let id = (event.serialNumber || "").toUpperCase().replace(/:/g, "");
+          const product = productMap[id];
+          if (product) {
             if(stock[product.name] <= 0) {
               alert(`${product.name} is out of stock!`);
               return;
@@ -426,7 +443,6 @@
     try {
       await saveStockToSheet();
       await saveLogToSheet(logEntry);
-      logs.push(logEntry);
     } catch(e) {
       alert("Failed to submit order: " + e.message);
       return;
@@ -479,7 +495,6 @@
       try {
         await saveStockToSheet();
         await saveLogToSheet(log);
-        logs.push(log);
         renderStock();
         input.value = "";
       } catch(e) {
@@ -566,12 +581,3 @@
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-

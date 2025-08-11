@@ -157,6 +157,8 @@
 </div>
 
 <script>
+  const GOOGLE_SHEET_API = "https://script.google.com/macros/s/AKfycbzyW5onvV-vuhccQ7hN5ARwOPNEDhIOPpq8timbwci7cmadZ3jZYEiSM5sT1FLB5YulfA/exec";
+
   // Product Map with colons in NFC tag IDs
   const productMap = {
     "04:A1:1F:89:32:02:89": { name: "Cleanser", price: 10 },
@@ -165,34 +167,83 @@
   };
 
   let order = [];
+  let stock = {};
+  let logs = [];
 
-  // Load stock from localStorage or default stock
-  const stock = JSON.parse(localStorage.getItem("stock")) || {
-    "Cleanser": 50,
-    "Toner": 50,
-    "Serum": 50
-  };
-
-  // Load logs from localStorage or empty
-  let logs = JSON.parse(localStorage.getItem("logs")) || [];
-
-  // Load order counter info for daily reset
+  // Order counter for daily reset (stored locally since Google Sheets doesn't track this)
   let orderCounterData = JSON.parse(localStorage.getItem("orderCounterData")) || {
     date: null,
     count: 0
   };
 
-  function saveStock() {
-    localStorage.setItem("stock", JSON.stringify(stock));
+  // ====== GOOGLE SHEETS API FUNCTIONS =======
+
+  // Load stock from Google Sheets
+  async function loadStockFromSheet() {
+    try {
+      const res = await fetch(`${GOOGLE_SHEET_API}?sheet=Stock`);
+      const data = await res.json();
+      stock = {};
+      data.forEach(item => {
+        stock[item.Product] = Number(item.Quantity);
+      });
+    } catch (e) {
+      alert("Failed to load stock from Google Sheets: " + e.message);
+    }
   }
 
-  function saveLogs() {
-    localStorage.setItem("logs", JSON.stringify(logs));
+  // Load logs from Google Sheets
+  async function loadLogsFromSheet() {
+    try {
+      const res = await fetch(`${GOOGLE_SHEET_API}?sheet=Logs`);
+      const data = await res.json();
+      // Parse JSON string Details back to object
+      logs = data.map(log => ({
+        type: log.Type,
+        timestamp: log.Timestamp,
+        orderNumber: log.OrderNumber,
+        details: JSON.parse(log.Details || "[]")
+      }));
+    } catch (e) {
+      alert("Failed to load logs from Google Sheets: " + e.message);
+      logs = [];
+    }
   }
 
-  function saveOrderCounter() {
-    localStorage.setItem("orderCounterData", JSON.stringify(orderCounterData));
+  // Save stock to Google Sheets
+  async function saveStockToSheet() {
+    try {
+      const stockArray = Object.keys(stock).map(k => ({ Product: k, Quantity: stock[k] }));
+      const res = await fetch(GOOGLE_SHEET_API, {
+        method: "POST",
+        body: JSON.stringify({ action: "updateStock", stock: stockArray }),
+        headers: { "Content-Type": "application/json" }
+      });
+      const json = await res.json();
+      if(json.status !== "success") throw new Error("Failed to save stock");
+    } catch (e) {
+      alert("Failed to save stock to Google Sheets: " + e.message);
+    }
   }
+
+  // Save a log entry to Google Sheets
+  async function saveLogToSheet(log) {
+    try {
+      const res = await fetch(GOOGLE_SHEET_API, {
+        method: "POST",
+        body: JSON.stringify({ action: "addLog", log }),
+        headers: { "Content-Type": "application/json" }
+      });
+      const json = await res.json();
+      if(json.status !== "success") throw new Error("Failed to save log");
+      // Also push locally for UI updates without reloading
+      logs.push(log);
+    } catch (e) {
+      alert("Failed to save log to Google Sheets: " + e.message);
+    }
+  }
+
+  // ======= UI AND APP LOGIC ========
 
   function hideAll() {
     document.querySelectorAll(".container").forEach(el => el.classList.add("hidden"));
@@ -225,7 +276,7 @@
     renderStock();
   }
 
-  function showServer() {
+  async function showServer() {
     hideAll();
     document.getElementById("serverPage").classList.remove("hidden");
     pruneLogsOlderThanOneWeek();
@@ -243,19 +294,17 @@
   }
 
   function receiptBack() {
-    // After viewing receipt, go back to main page (or could be customer page if preferred)
     hideAll();
     document.getElementById("mainPage").classList.remove("hidden");
   }
 
-  // Start NFC Scan and match ignoring colons
+  // NFC scan (same as before)
   function startNFC() {
     if ("NDEFReader" in window) {
       const reader = new NDEFReader();
       reader.scan().then(() => {
         reader.onreading = (event) => {
           let id = event.serialNumber.toUpperCase().replace(/:/g, "");
-          // Find product ignoring colons in keys
           const entry = Object.entries(productMap).find(([key]) => key.toUpperCase().replace(/:/g, "") === id);
           if (entry) {
             const product = entry[1];
@@ -292,6 +341,7 @@
     }
   }
 
+  // Update order summary UI
   function updateSummary() {
     const div = document.getElementById("summary");
     div.innerHTML = "<h4>Order Summary</h4>";
@@ -333,25 +383,14 @@
     updateSummary();
   }
 
-  // Generate daily order number, reset count if new day
-  function getOrderNumber() {
-    const today = new Date().toISOString().slice(0,10); // YYYY-MM-DD
-    if(orderCounterData.date !== today) {
-      orderCounterData.date = today;
-      orderCounterData.count = 1;
-    } else {
-      orderCounterData.count++;
-    }
-    saveOrderCounter();
-    return String(orderCounterData.count).padStart(3, '0');
-  }
-
-  function submitOrder() {
+  // Submit order: check stock, save stock & log to Google Sheets, show receipt
+  async function submitOrder() {
     if (order.length === 0) {
       alert("No order to submit.");
       return;
     }
-    // Check stock availability one more time before submit
+
+    // Check stock availability
     for (const item of order) {
       if (stock[item.name] < item.qty) {
         alert(`Not enough stock for ${item.name}. Please adjust your order.`);
@@ -359,73 +398,50 @@
       }
     }
 
-    // Reduce stock and save
+    // Generate or reset daily order number
+    const today = new Date().toISOString().slice(0,10); // yyyy-mm-dd
+    if(orderCounterData.date !== today){
+      orderCounterData.date = today;
+      orderCounterData.count = 1;
+    } else {
+      orderCounterData.count++;
+    }
+    localStorage.setItem("orderCounterData", JSON.stringify(orderCounterData));
+    const orderNumber = String(orderCounterData.count).padStart(3, "0");
+
+    // Prepare log object
+    const timestamp = new Date().toLocaleString();
+    const logEntry = {
+      type: "Order",
+      timestamp,
+      orderNumber,
+      details: JSON.parse(JSON.stringify(order))
+    };
+
+    // Deduct stock
     order.forEach(item => {
       stock[item.name] -= item.qty;
     });
-    saveStock();
 
-    // Prepare log entry with timestamp and order details
-    const timestamp = new Date();
-    const timestampStr = timestamp.toLocaleString();
-    const orderNumber = getOrderNumber();
+    try {
+      await saveStockToSheet();
+      await saveLogToSheet(logEntry);
+      logs.push(logEntry);
+    } catch(e) {
+      alert("Failed to submit order: " + e.message);
+      return;
+    }
 
-    logs.push({ 
-      type: "Order", 
-      timestamp: timestampStr, 
-      orderNumber,
-      details: JSON.parse(JSON.stringify(order)) 
-    });
-    saveLogs();
-
-    // Show receipt page with order summary
-    showReceipt(order, timestampStr, orderNumber);
-
-    // Clear current order and update UI
+    // Clear order and update UI
     order = [];
     updateSummary();
+
+    // Show receipt page with details
+    showReceipt(logEntry);
+
   }
 
-  function showReceipt(orderDetails, timestampStr, orderNumber) {
-    hideAll();
-    const receiptDiv = document.getElementById("receiptContent");
-    let totalCost = 0;
-    let totalItems = 0;
-
-    let html = `
-      <h4>Order Number: ${orderNumber}</h4>
-      <p><b>Date/Time:</b> ${timestampStr}</p>
-      <table>
-        <tr><th>Product</th><th>Quantity</th><th>Unit Price</th><th>Subtotal</th></tr>
-    `;
-
-    orderDetails.forEach(item => {
-      const subtotal = item.qty * item.price;
-      totalCost += subtotal;
-      totalItems += item.qty;
-      html += `<tr>
-        <td>${item.name}</td>
-        <td>${item.qty}</td>
-        <td>${item.price} ฿</td>
-        <td>${subtotal} ฿</td>
-      </tr>`;
-    });
-
-    html += `
-      <tr class="total-row">
-        <td><b>Total</b></td>
-        <td>${totalItems}</td>
-        <td></td>
-        <td>${totalCost} ฿</td>
-      </tr>
-      </table>
-      <p>Thank you for your order!</p>
-    `;
-
-    receiptDiv.innerHTML = html;
-    document.getElementById("receiptPage").classList.remove("hidden");
-  }
-
+  // Render stock table in admin
   function renderStock() {
     const div = document.getElementById("stockTable");
     let html = "<table><tr><th>Product</th><th>Stock</th><th>Adjust Stock</th></tr>";
@@ -444,7 +460,8 @@
     div.innerHTML = html;
   }
 
-  function adjustStock(name, add) {
+  // Adjust stock and save to sheet + log
+  async function adjustStock(name, add) {
     const input = document.getElementById(`qty-${name}`);
     const val = parseInt(input.value);
     if (!isNaN(val) && val > 0) {
@@ -454,20 +471,26 @@
       }
       stock[name] += add ? val : -val;
       const timestamp = new Date().toLocaleString();
-      logs.push({
+      const log = {
         type: add ? "Stock Added" : "Stock Removed",
         timestamp,
         details: [{ name, qty: val }]
-      });
-      saveStock();
-      saveLogs();
-      renderStock();
-      input.value = "";
+      };
+      try {
+        await saveStockToSheet();
+        await saveLogToSheet(log);
+        logs.push(log);
+        renderStock();
+        input.value = "";
+      } catch(e) {
+        alert("Failed to update stock: " + e.message);
+      }
     } else {
       alert("Please enter a valid positive number.");
     }
   }
 
+  // Render logs in server page
   function renderLogs() {
     const div = document.getElementById("serverLog");
     div.innerHTML = "";
@@ -477,37 +500,67 @@
     }
     // Show newest logs first
     logs.slice().reverse().forEach(log => {
-      let entries;
-      if(log.type === "Order") {
-        entries = log.details.map(d => `${d.name} (${d.qty})`).join(", ");
-      } else {
-        entries = log.details.map(d => `${d.name} (${d.qty})`).join(", ");
-      }
-      const orderNumHtml = log.orderNumber ? `<b>Order No:</b> ${log.orderNumber}<br/>` : "";
+      const entries = log.details.map(d => `${d.name} (${d.qty})`).join(", ");
       const entry = `
         <div style="margin-bottom:10px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
-          <b>${log.type}</b> - ${log.timestamp}<br/>
-          ${orderNumHtml}
+          <b>${log.type}</b> - ${log.timestamp}${log.orderNumber ? ` - #${log.orderNumber}` : ""}<br/>
           ${entries}
         </div>`;
       div.innerHTML += entry;
     });
   }
 
-  // Remove logs older than 7 days
+  // Prune logs older than one week from local logs only (Google Sheet will grow but app hides old logs)
   function pruneLogsOlderThanOneWeek() {
-    const now = Date.now();
-    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const oneWeekAgo = new Date(Date.now() - 7*24*60*60*1000);
     logs = logs.filter(log => {
-      // Parse timestamp string to date for comparison
-      // Because we saved timestamp as toLocaleString (not ISO), parse carefully:
-      // We'll try Date.parse, fallback to keep log if fail
-      const time = Date.parse(log.timestamp);
-      if (isNaN(time)) return true; // keep if can't parse
-      return (now - time) <= weekMs;
+      const logDate = new Date(log.timestamp);
+      return logDate >= oneWeekAgo;
     });
-    saveLogs();
   }
+
+  // Show receipt page for last order
+  function showReceipt(logEntry) {
+    hideAll();
+    const receiptDiv = document.getElementById("receiptContent");
+    receiptDiv.innerHTML = "";
+
+    const totalItems = logEntry.details.reduce((a,b) => a + b.qty, 0);
+    const totalCost = logEntry.details.reduce((a,b) => a + b.qty * b.price, 0);
+
+    let html = `<h4>Receipt</h4>
+      <p><b>Order Number:</b> #${logEntry.orderNumber}</p>
+      <p><b>Timestamp:</b> ${logEntry.timestamp}</p>
+      <p><b>Number of Products:</b> ${totalItems}</p>
+      <table>
+        <tr><th>Product</th><th>Quantity</th><th>Price per unit (฿)</th><th>Total Price (฿)</th></tr>`;
+
+    logEntry.details.forEach(item => {
+      html += `<tr>
+        <td>${item.name}</td>
+        <td>${item.qty}</td>
+        <td>${item.price}</td>
+        <td>${item.qty * item.price}</td>
+      </tr>`;
+    });
+
+    html += `<tr class="total-row">
+        <td colspan="3">Total Cost</td>
+        <td>${totalCost} ฿</td>
+      </tr></table>`;
+
+    receiptDiv.innerHTML = html;
+
+    document.getElementById("receiptPage").classList.remove("hidden");
+  }
+
+  // On page load: load stock & logs from sheet
+  async function init() {
+    await loadStockFromSheet();
+    await loadLogsFromSheet();
+  }
+
+  init();
 
 </script>
 

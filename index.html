@@ -71,6 +71,33 @@
     #summary table td:nth-child(3), #summary table td:nth-child(2) {
       width: 80px;
     }
+
+    /* Receipt styles */
+    #receiptContent {
+      font-size: 1rem;
+      line-height: 1.4;
+    }
+    #receiptContent h4 {
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    #receiptContent table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+    #receiptContent table, #receiptContent th, #receiptContent td {
+      border: 1px solid #ccc;
+    }
+    #receiptContent th, #receiptContent td {
+      padding: 8px;
+      text-align: center;
+    }
+    #receiptContent .total-row td {
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
   </style>
 </head>
 <body>
@@ -93,6 +120,15 @@
     <button onclick="goBack()">Back</button>
   </div>
   <div id="summary"></div>
+</div>
+
+<!-- Receipt Page -->
+<div class="container hidden" id="receiptPage">
+  <h3>Order Receipt</h3>
+  <div id="receiptContent"></div>
+  <div class="row">
+    <button onclick="receiptBack()">Back to Main</button>
+  </div>
 </div>
 
 <!-- Admin Login -->
@@ -138,7 +174,13 @@
   };
 
   // Load logs from localStorage or empty
-  const logs = JSON.parse(localStorage.getItem("logs")) || [];
+  let logs = JSON.parse(localStorage.getItem("logs")) || [];
+
+  // Load order counter info for daily reset
+  let orderCounterData = JSON.parse(localStorage.getItem("orderCounterData")) || {
+    date: null,
+    count: 0
+  };
 
   function saveStock() {
     localStorage.setItem("stock", JSON.stringify(stock));
@@ -146,6 +188,10 @@
 
   function saveLogs() {
     localStorage.setItem("logs", JSON.stringify(logs));
+  }
+
+  function saveOrderCounter() {
+    localStorage.setItem("orderCounterData", JSON.stringify(orderCounterData));
   }
 
   function hideAll() {
@@ -182,6 +228,7 @@
   function showServer() {
     hideAll();
     document.getElementById("serverPage").classList.remove("hidden");
+    pruneLogsOlderThanOneWeek();
     renderLogs();
   }
 
@@ -193,6 +240,12 @@
   function backToAdmin() {
     hideAll();
     document.getElementById("adminPage").classList.remove("hidden");
+  }
+
+  function receiptBack() {
+    // After viewing receipt, go back to main page (or could be customer page if preferred)
+    hideAll();
+    document.getElementById("mainPage").classList.remove("hidden");
   }
 
   // Start NFC Scan and match ignoring colons
@@ -280,6 +333,19 @@
     updateSummary();
   }
 
+  // Generate daily order number, reset count if new day
+  function getOrderNumber() {
+    const today = new Date().toISOString().slice(0,10); // YYYY-MM-DD
+    if(orderCounterData.date !== today) {
+      orderCounterData.date = today;
+      orderCounterData.count = 1;
+    } else {
+      orderCounterData.count++;
+    }
+    saveOrderCounter();
+    return String(orderCounterData.count).padStart(3, '0');
+  }
+
   function submitOrder() {
     if (order.length === 0) {
       alert("No order to submit.");
@@ -293,16 +359,71 @@
       }
     }
 
-    const timestamp = new Date().toLocaleString();
-    logs.push({ type: "Order", timestamp, details: JSON.parse(JSON.stringify(order)) });
+    // Reduce stock and save
     order.forEach(item => {
       stock[item.name] -= item.qty;
     });
     saveStock();
+
+    // Prepare log entry with timestamp and order details
+    const timestamp = new Date();
+    const timestampStr = timestamp.toLocaleString();
+    const orderNumber = getOrderNumber();
+
+    logs.push({ 
+      type: "Order", 
+      timestamp: timestampStr, 
+      orderNumber,
+      details: JSON.parse(JSON.stringify(order)) 
+    });
     saveLogs();
+
+    // Show receipt page with order summary
+    showReceipt(order, timestampStr, orderNumber);
+
+    // Clear current order and update UI
     order = [];
     updateSummary();
-    alert("Order submitted successfully!");
+  }
+
+  function showReceipt(orderDetails, timestampStr, orderNumber) {
+    hideAll();
+    const receiptDiv = document.getElementById("receiptContent");
+    let totalCost = 0;
+    let totalItems = 0;
+
+    let html = `
+      <h4>Order Number: ${orderNumber}</h4>
+      <p><b>Date/Time:</b> ${timestampStr}</p>
+      <table>
+        <tr><th>Product</th><th>Quantity</th><th>Unit Price</th><th>Subtotal</th></tr>
+    `;
+
+    orderDetails.forEach(item => {
+      const subtotal = item.qty * item.price;
+      totalCost += subtotal;
+      totalItems += item.qty;
+      html += `<tr>
+        <td>${item.name}</td>
+        <td>${item.qty}</td>
+        <td>${item.price} ฿</td>
+        <td>${subtotal} ฿</td>
+      </tr>`;
+    });
+
+    html += `
+      <tr class="total-row">
+        <td><b>Total</b></td>
+        <td>${totalItems}</td>
+        <td></td>
+        <td>${totalCost} ฿</td>
+      </tr>
+      </table>
+      <p>Thank you for your order!</p>
+    `;
+
+    receiptDiv.innerHTML = html;
+    document.getElementById("receiptPage").classList.remove("hidden");
   }
 
   function renderStock() {
@@ -356,15 +477,38 @@
     }
     // Show newest logs first
     logs.slice().reverse().forEach(log => {
-      const entries = log.details.map(d => `${d.name} (${d.qty})`).join(", ");
+      let entries;
+      if(log.type === "Order") {
+        entries = log.details.map(d => `${d.name} (${d.qty})`).join(", ");
+      } else {
+        entries = log.details.map(d => `${d.name} (${d.qty})`).join(", ");
+      }
+      const orderNumHtml = log.orderNumber ? `<b>Order No:</b> ${log.orderNumber}<br/>` : "";
       const entry = `
         <div style="margin-bottom:10px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
           <b>${log.type}</b> - ${log.timestamp}<br/>
+          ${orderNumHtml}
           ${entries}
         </div>`;
       div.innerHTML += entry;
     });
   }
+
+  // Remove logs older than 7 days
+  function pruneLogsOlderThanOneWeek() {
+    const now = Date.now();
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    logs = logs.filter(log => {
+      // Parse timestamp string to date for comparison
+      // Because we saved timestamp as toLocaleString (not ISO), parse carefully:
+      // We'll try Date.parse, fallback to keep log if fail
+      const time = Date.parse(log.timestamp);
+      if (isNaN(time)) return true; // keep if can't parse
+      return (now - time) <= weekMs;
+    });
+    saveLogs();
+  }
+
 </script>
 
 </body>

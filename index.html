@@ -512,7 +512,7 @@
     const div = document.getElementById("serverLog");
     div.innerHTML = "";
     try {
-      const res = await fetch(`${SCRIPT_URL}?sheet=Logs`);
+      const res = await fetch(`${SCRIPT_URL}?sheet=Log`); // <-- Fixed from 'Logs' to 'Log'
       const logs = await res.json();
       if (logs.length === 0) {
         div.innerHTML = "<p>No logs available.</p>";
@@ -540,4 +540,5 @@
   }
 
 </script>
-
+</body>
+</html>

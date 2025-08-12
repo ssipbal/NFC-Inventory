@@ -157,9 +157,6 @@
 </div>
 
 <script>
-  // Use your proxy server URL here instead of direct Google Apps Script URL
-  const SCRIPT_URL = "http://localhost:3000/?sheet=Stock";
-
   // Product Map with colons in NFC tag IDs
   const productMap = {
     "04:A1:1F:89:32:02:89": { name: "Cleanser", price: 10 },
@@ -169,16 +166,30 @@
 
   let order = [];
 
-  // Stock object (will be loaded from Google Sheets)
-  const stock = {};
+  // Load stock from localStorage or default stock
+  const stock = JSON.parse(localStorage.getItem("stock")) || {
+    "Cleanser": 50,
+    "Toner": 50,
+    "Serum": 50
+  };
 
-  // Load order counter info for daily reset (using localStorage still)
+  // Load logs from localStorage or empty
+  let logs = JSON.parse(localStorage.getItem("logs")) || [];
+
+  // Load order counter info for daily reset
   let orderCounterData = JSON.parse(localStorage.getItem("orderCounterData")) || {
     date: null,
     count: 0
   };
 
-  // Save order counter to localStorage
+  function saveStock() {
+    localStorage.setItem("stock", JSON.stringify(stock));
+  }
+
+  function saveLogs() {
+    localStorage.setItem("logs", JSON.stringify(logs));
+  }
+
   function saveOrderCounter() {
     localStorage.setItem("orderCounterData", JSON.stringify(orderCounterData));
   }
@@ -208,56 +219,9 @@
     }
   }
 
-  // Load stock from Google Sheets via proxy
-  async function loadStock() {
-    try {
-      const res = await fetch(`${SCRIPT_URL}?sheet=Stock`);
-      const data = await res.json();
-      // Clear current stock object
-      for (const key in stock) delete stock[key];
-      data.forEach(item => {
-        stock[item.Product] = parseInt(item.Quantity);
-      });
-    } catch (e) {
-      alert("Failed to load stock from server: " + e);
-    }
-  }
-
-  // Save stock to Google Sheets via proxy
-  async function saveStockToSheet() {
-    const stockArray = Object.keys(stock).map(name => ({
-      Product: name,
-      Quantity: stock[name]
-    }));
-    try {
-      await fetch(`${SCRIPT_URL}?action=updateStock`, {
-        method: "POST",
-        body: JSON.stringify(stockArray),
-        headers: { "Content-Type": "application/json" }
-      });
-    } catch (e) {
-      alert("Failed to save stock to server: " + e);
-    }
-  }
-
-  // Add logs to Google Sheets via proxy
-  async function addLogToSheet(logArray) {
-    try {
-      await fetch(`${SCRIPT_URL}?action=addLog`, {
-        method: "POST",
-        body: JSON.stringify(logArray),
-        headers: { "Content-Type": "application/json" }
-      });
-    } catch (e) {
-      alert("Failed to add logs to server: " + e);
-    }
-  }
-
-  // Show admin page and load stock
-  async function showAdmin() {
+  function showAdmin() {
     hideAll();
     document.getElementById("adminPage").classList.remove("hidden");
-    await loadStock();
     renderStock();
   }
 
@@ -279,6 +243,7 @@
   }
 
   function receiptBack() {
+    // After viewing receipt, go back to main page (or could be customer page if preferred)
     hideAll();
     document.getElementById("mainPage").classList.remove("hidden");
   }
@@ -381,8 +346,7 @@
     return String(orderCounterData.count).padStart(3, '0');
   }
 
-  // Submit order (async because we save to server)
-  async function submitOrder() {
+  function submitOrder() {
     if (order.length === 0) {
       alert("No order to submit.");
       return;
@@ -399,20 +363,20 @@
     order.forEach(item => {
       stock[item.name] -= item.qty;
     });
+    saveStock();
 
     // Prepare log entry with timestamp and order details
     const timestamp = new Date();
     const timestampStr = timestamp.toLocaleString();
     const orderNumber = getOrderNumber();
 
-    // Save stock and logs to Google Sheets
-    await saveStockToSheet();
-    await addLogToSheet([{
-      Type: "Order",
-      Timestamp: timestampStr,
-      OrderNumber: orderNumber,
-      Detail: order.map(d => `${d.name} (${d.qty})`).join(", ")
-    }]);
+    logs.push({ 
+      type: "Order", 
+      timestamp: timestampStr, 
+      orderNumber,
+      details: JSON.parse(JSON.stringify(order)) 
+    });
+    saveLogs();
 
     // Show receipt page with order summary
     showReceipt(order, timestampStr, orderNumber);
@@ -480,7 +444,7 @@
     div.innerHTML = html;
   }
 
-  async function adjustStock(name, add) {
+  function adjustStock(name, add) {
     const input = document.getElementById(`qty-${name}`);
     const val = parseInt(input.value);
     if (!isNaN(val) && val > 0) {
@@ -489,17 +453,14 @@
         return;
       }
       stock[name] += add ? val : -val;
-
       const timestamp = new Date().toLocaleString();
-
-      await saveStockToSheet();
-
-      await addLogToSheet([{
-        Type: add ? "Stock Added" : "Stock Removed",
-        Timestamp: timestamp,
-        Detail: `${name} (${val})`
-      }]);
-
+      logs.push({
+        type: add ? "Stock Added" : "Stock Removed",
+        timestamp,
+        details: [{ name, qty: val }]
+      });
+      saveStock();
+      saveLogs();
       renderStock();
       input.value = "";
     } else {
@@ -507,39 +468,51 @@
     }
   }
 
-  // Render logs from Google Sheets via proxy
-  async function renderLogs() {
+  function renderLogs() {
     const div = document.getElementById("serverLog");
     div.innerHTML = "";
-    try {
-      const res = await fetch(`${SCRIPT_URL}?sheet=Log`); // <-- Fixed from 'Logs' to 'Log'
-      const logs = await res.json();
-      if (logs.length === 0) {
-        div.innerHTML = "<p>No logs available.</p>";
-        return;
-      }
-      // Show newest logs first
-      logs.slice().reverse().forEach(log => {
-        const orderNumHtml = log.OrderNumber ? `<b>Order No:</b> ${log.OrderNumber}<br/>` : "";
-        const entry = `
-          <div style="margin-bottom:10px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
-            <b>${log.Type}</b> - ${log.Timestamp}<br/>
-            ${orderNumHtml}
-            ${log.Detail}
-          </div>`;
-        div.innerHTML += entry;
-      });
-    } catch (e) {
-      div.innerHTML = `<p>Error loading logs: ${e}</p>`;
+    if(logs.length === 0){
+      div.innerHTML = "<p>No logs available.</p>";
+      return;
     }
+    // Show newest logs first
+    logs.slice().reverse().forEach(log => {
+      let entries;
+      if(log.type === "Order") {
+        entries = log.details.map(d => `${d.name} (${d.qty})`).join(", ");
+      } else {
+        entries = log.details.map(d => `${d.name} (${d.qty})`).join(", ");
+      }
+      const orderNumHtml = log.orderNumber ? `<b>Order No:</b> ${log.orderNumber}<br/>` : "";
+      const entry = `
+        <div style="margin-bottom:10px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+          <b>${log.type}</b> - ${log.timestamp}<br/>
+          ${orderNumHtml}
+          ${entries}
+        </div>`;
+      div.innerHTML += entry;
+    });
   }
 
-  // Prune logs older than 7 days - Ideally handled server-side in Apps Script
+  // Remove logs older than 7 days
   function pruneLogsOlderThanOneWeek() {
-    // no-op here, prune in backend if you want
+    const now = Date.now();
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    logs = logs.filter(log => {
+      // Parse timestamp string to date for comparison
+      // Because we saved timestamp as toLocaleString (not ISO), parse carefully:
+      // We'll try Date.parse, fallback to keep log if fail
+      const time = Date.parse(log.timestamp);
+      if (isNaN(time)) return true; // keep if can't parse
+      return (now - time) <= weekMs;
+    });
+    saveLogs();
   }
 
 </script>
+
 </body>
 </html>
+
+
 

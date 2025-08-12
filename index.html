@@ -157,8 +157,8 @@
 </div>
 
 <script>
-  // Your Apps Script Web App URL
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwt_oqpP8aoEme29xMeaYTshnxLj0alU6KP4iS2mpW_sy2fBkFtGlWSTgSbKb9YUFDPNA/exec";
+  // Use your proxy server URL here instead of direct Google Apps Script URL
+  const SCRIPT_URL = "http://localhost:3000/proxy";
 
   // Product Map with colons in NFC tag IDs
   const productMap = {
@@ -208,7 +208,7 @@
     }
   }
 
-  // Load stock from Google Sheets
+  // Load stock from Google Sheets via proxy
   async function loadStock() {
     try {
       const res = await fetch(`${SCRIPT_URL}?sheet=Stock`);
@@ -223,7 +223,7 @@
     }
   }
 
-  // Save stock to Google Sheets
+  // Save stock to Google Sheets via proxy
   async function saveStockToSheet() {
     const stockArray = Object.keys(stock).map(name => ({
       Product: name,
@@ -240,7 +240,7 @@
     }
   }
 
-  // Add logs to Google Sheets
+  // Add logs to Google Sheets via proxy
   async function addLogToSheet(logArray) {
     try {
       await fetch(`${SCRIPT_URL}?action=addLog`, {
@@ -507,7 +507,7 @@
     }
   }
 
-  // Render logs from Google Sheets
+  // Render logs from Google Sheets via proxy
   async function renderLogs() {
     const div = document.getElementById("serverLog");
     div.innerHTML = "";
@@ -540,10 +540,3 @@
   }
 
 </script>
-
-</body>
-</html>
-
-
-
-
